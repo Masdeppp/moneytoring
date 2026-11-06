@@ -1,0 +1,7 @@
+{
+  "@@locale": "id",
+  "appName": "Moneytoring",
+  "@appName": {
+    "description": "Nama aplikasi (working title). Ganti di sini dan di android:label saja."
+  }
+}

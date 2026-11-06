@@ -1,0 +1,5 @@
+# Simpan teks dengan LF di repo dan di working copy (Windows & Linux CI sama).
+* text=auto eol=lf
+*.png binary
+*.ttf binary
+*.jar binary

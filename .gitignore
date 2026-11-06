@@ -1,0 +1,9 @@
+# Pengaturan lokal Claude Code / editor
+.claude/settings.local.json
+.idea/
+.vscode/
+
+# Sistem operasi
+.DS_Store
+Thumbs.db
+desktop.ini

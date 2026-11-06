@@ -1,0 +1,8 @@
+{
+  "name": "Moneytoring — Build MVP Screens",
+  "id": "moneytoring-build-mvp-screens",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page"
+}

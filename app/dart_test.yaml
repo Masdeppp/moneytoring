@@ -1,0 +1,4 @@
+tags:
+  # Golden dibuat di Windows. Render font di Linux (CI) sedikit berbeda,
+  # jadi CI menjalankan test dengan --exclude-tags golden.
+  golden: {}

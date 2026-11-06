@@ -1,0 +1,41 @@
+name: App CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code (drift)
+        run: dart run build_runner build
+
+      - name: Generated files are committed
+        run: git diff --exit-code -- lib test
+
+      - name: Format (tanpa file hasil generate)
+        run: dart format --output=none --set-exit-if-changed $(git ls-files '*.dart' | grep -vE '\.g\.dart$|^lib/l10n/')
+
+      - name: Analyze
+        run: flutter analyze
+
+      # Golden dibuat di Windows; render font Linux berbeda, jadi dilewati di CI.
+      - name: Test
+        run: flutter test --exclude-tags golden

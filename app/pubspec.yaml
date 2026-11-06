@@ -1,0 +1,58 @@
+name: keuangan_app
+description: "Moneytoring (working title): aplikasi keuangan pribadi dengan Safe-to-Spend sampai gajian."
+publish_to: 'none'
+
+# Nama package & applicationId sengaja netral karena nama brand masih
+# working title (PRD §10.5).
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Database lokal terenkripsi (Drift + SQLite3MultipleCiphers, lihat hooks).
+  drift: ^2.35.3
+  sqlite3: ^3.9.0
+  path: ^1.9.1
+  path_provider: ^2.1.6
+  flutter_secure_storage: ^11.2.0
+
+  # Arsitektur
+  flutter_riverpod: ^3.4.3
+  go_router: ^18.1.3
+
+  # UI & format
+  intl: ^0.20.3
+  lucide_icons_flutter: ^4.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  drift_dev: ^2.35.2
+  build_runner: ^2.17.1
+
+flutter:
+  uses-material-design: true
+  # Membuat lib/l10n/app_localizations.dart dari lib/l10n/app_id.arb.
+  generate: true
+
+  fonts:
+    # Variable font (sumbu wght 200–800), dibundel supaya tampil saat offline.
+    # Lisensi: assets/fonts/OFL.txt
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-Variable.ttf
+
+# Enkripsi database: build SQLite dengan SQLite3MultipleCiphers.
+# Tanpa blok ini, PRAGMA key diabaikan dan data tersimpan tanpa enkripsi
+# (connection.dart menolak membuka database dalam kondisi itu).
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
