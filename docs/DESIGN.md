@@ -183,3 +183,54 @@ class AppColors extends ThemeExtension<AppColors> {
 - `ColorScheme` M3 diisi dari token: primary = `bg/brand`, onPrimary = `text/on-brand`, surface = `bg/surface`, dst. Token khusus (hero, tone, status) masuk `ThemeExtension`.
 - `TextTheme` dibuat dari tabel tipografi (package `google_fonts`, atau bundle font di `assets/fonts` agar jalan offline, sesuai prinsip offline-first di PRD).
 - Spacing & radius sebagai konstanta `AppSpacing` / `AppRadius`.
+
+---
+
+## 8. Prototype & interaksi
+
+Interaksi dipasang oleh plugin lokal [tools/figma-prototype-plugin](../tools/figma-prototype-plugin/README.md), yang dijalankan sendiri di Figma Desktop. Plugin aman dijalankan ulang dan tidak mengubah tampilan layar. README plugin berisi daftar lengkap interaksi per elemen; bagian ini merangkum perilaku yang juga menjadi acuan implementasi Flutter. Plugin **belum dijalankan** di file Figma, jadi status di Figma perlu dicek lewat Present setelah plugin dijalankan.
+
+### 8.1 Flow (Present → pilih flow)
+
+| Flow | Mulai | Alur utama |
+|---|---|---|
+| **Onboarding** | 01 | 01 Siklus Gajian → 02 Kewajiban Rutin → 03 Aha Moment → 04 Beranda (smart animate; ‹ di stepper = kembali) |
+| **Beranda** | 04 | Tab bar 04 · 07 · 08 · 09, FAB → Tambah Transaksi, drill-down ke 10 dan 11 |
+
+### 8.2 Navigasi
+
+| Dari | Elemen | Ke | Transisi |
+|---|---|---|---|
+| 04, 05, 07 | FAB | Bottom sheet Tambah Transaksi (overlay) | Move in dari bawah |
+| Sheet 06 | "Simpan" / tap di luar / geser sheet | Tutup sheet, kembali ke Beranda | — |
+| 04, 05, 07, 08, 09 | NavBar | 04 / 07 / 08 / 09 | Dissolve |
+| 04, 05 | "Lihat semua" | 08 (kewajiban) / 07 (transaksi) | Dissolve |
+| 04, 05 | Kartu Safe-to-Spend | 10 Simulasi What-If | Push dari kanan |
+| 09 | "Coba Premium" | 10 Simulasi What-If | Push dari kanan |
+| 05 | AlertBanner A1, lonceng, item "Cicilan motor" | 11 Detail Peringatan | Push dari kanan |
+| 04 | Lonceng | 09 Insight | Dissolve |
+| 10 | "Tunda & ingatkan saya" / ‹ | Kembali | — |
+| 10 | "Tetap beli & catat" | 05 Beranda Berisiko | Dissolve |
+| 11 | Salah satu "Cara mengamankan" | 04 Beranda Aman | Dissolve |
+| 11 | ‹ | Kembali | — |
+
+### 8.3 Behavior komponen
+
+| Komponen | Behavior | Catatan Flutter |
+|---|---|---|
+| **Chip** | Tap: Default ↔ Selected | `FilterChip.selected`. Di Flutter, filter 07 dan aturan gajian 01 dibuat *single-select*, walaupun di prototype masih bisa multi-select. |
+| **NavBar** | Tab aktif mengikuti layar; tap tab = pindah layar | `NavigationBar` + `StatefulShellRoute` |
+| **Proto/TypeToggle** (06) | Pengeluaran ↔ Pemasukan | `SegmentedButton<TransactionType>` |
+| **Proto/FeedbackButton** (09, 11) | 👍/👎 Off ↔ On. 👎 aktif berwarna netral, bukan merah (aturan §1.3) | `IconButton(isSelected:)`; kirim feedback ke engine alert |
+| **SafeToSpendCard** | Aman → Berisiko setelah transaksi besar: frame 04 → 05 dengan smart animate (kartu hijau → merah + AlertBanner muncul). Dipicu "Tetap beli & catat" di 10, atau tombol **B** saat Present (**A** untuk kembali) | `AnimatedContainer` / `TweenAnimationBuilder` untuk warna hero saat tier risiko berubah |
+
+`Proto/TypeToggle` dan `Proto/FeedbackButton` dibuat oleh plugin di section *Prototype Components* (halaman Components). Keduanya khusus prototype dan belum menjadi bagian design system di §4.
+
+### 8.4 Scroll
+
+- `Body` di semua layar (kecuali 06) scroll vertikal. StatusBar, NavBar, Footer, dan FAB berada di luar `Body`, jadi tetap di tempat.
+- Baris chip filter (07) serta kategori dan akun/tanggal di sheet 06 scroll horizontal.
+
+### 8.5 Tidak dipakai (paket Starter)
+
+Variabel, conditional, dan multiple actions di prototype tidak dipakai. Perubahan state (Aman → Berisiko, nominal setelah transaksi) ditampilkan dengan frame terpisah + navigasi biasa. Keypad di 06 tidak mengubah nominal di prototype.
