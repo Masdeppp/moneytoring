@@ -28,6 +28,10 @@ class Accounts extends Table {
   TextColumn get icon => text()();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
   IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  /// `false` untuk rekening yang tidak boleh dibelanjakan, mis. dana darurat.
+  /// Saldonya tidak ikut dihitung di Safe-to-Spend. (v2)
+  BoolColumn get includeInSafeToSpend => boolean().withDefault(const Constant(true))();
 }
 
 @DataClassName('CategoryRecord')
@@ -48,6 +52,7 @@ class Categories extends Table {
 @TableIndex(name: 'idx_transactions_date', columns: {#date})
 @TableIndex(name: 'idx_transactions_account', columns: {#accountId})
 @TableIndex(name: 'idx_transactions_category', columns: {#categoryId})
+@TableIndex(name: 'idx_transactions_obligation_instance', columns: {#obligationInstanceId})
 class Transactions extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get type => textEnum<TransactionType>()();
@@ -86,6 +91,15 @@ class PayCycleConfigs extends Table {
   BoolColumn get shiftOnHoliday => boolean().withDefault(const Constant(true))();
   IntColumn get expectedIncome => integer().withDefault(const Constant(0))();
 
+  /// Hari pertama pengguna mencatat (selesai onboarding). Pace dan proyeksi
+  /// dihitung mulai tanggal ini. (v2)
+  DateTimeColumn get trackingSince => dateTime()();
+
+  /// Dana cadangan Safe-to-Spend dalam basis poin: 500 = 5%. (v2)
+  IntColumn get bufferBasisPoints => integer()
+      .withDefault(const Constant(500))
+      .check(bufferBasisPoints.isBetweenValues(0, 10000))();
+
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -104,22 +118,30 @@ class Obligations extends Table {
 
   /// Kata kunci tambahan untuk auto-match, dipisah koma.
   TextColumn get autoMatchKeywords => text().withDefault(const Constant(''))();
+
+  /// Jatuh tempo sebelum tanggal ini dianggap sudah diurus sebelum kewajiban
+  /// dicatat, jadi tidak dibuatkan instance. (v2)
+  DateTimeColumn get startsOn => dateTime()();
 }
 
-/// Satu kemunculan kewajiban di satu siklus gajian.
+/// Satu jatuh tempo kewajiban.
+///
+/// Dibuat per tanggal jatuh tempo, bukan per siklus: siklus yang bergeser
+/// karena libur bisa memuat dua jatuh tempo atau tidak sama sekali
+/// (docs/FASE1.md §2). Siklusnya dihitung dari `dueDate` + aturan gajian. (v2)
 @DataClassName('ObligationInstanceRecord')
+@TableIndex(name: 'idx_obligation_instances_due', columns: {#dueDate})
 class ObligationInstances extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get obligationId =>
       integer().references(Obligations, #id, onDelete: KeyAction.cascade)();
-  DateTimeColumn get cycleStart => dateTime()();
   DateTimeColumn get dueDate => dateTime()();
   IntColumn get expectedAmount => integer()();
   TextColumn get status => textEnum<ObligationStatus>().withDefault(const Constant('pending'))();
 
   @override
   List<Set<Column<Object>>> get uniqueKeys => [
-    {obligationId, cycleStart},
+    {obligationId, dueDate},
   ];
 }
 

@@ -26,6 +26,7 @@ class SafeToSpendCard extends StatelessWidget {
     required this.protectedAmount,
     required this.protectedCount,
     this.onTap,
+    this.showPace = true,
   });
 
   final RiskLevel risk;
@@ -43,6 +44,10 @@ class SafeToSpendCard extends StatelessWidget {
   final int protectedAmount;
   final int protectedCount;
   final VoidCallback? onTap;
+
+  /// Bar pace disembunyikan di layar aha onboarding, saat belum ada belanja
+  /// yang bisa dibandingkan dengan waktu (Figma layar 03).
+  final bool showPace;
 
   String get _paceText => switch (risk) {
     RiskLevel.safe => 'Belanja masih sejalan dengan waktu',
@@ -111,15 +116,17 @@ class SafeToSpendCard extends StatelessWidget {
                     style: AppTypography.bodyMedium.copyWith(color: muted),
                   ),
                   const SizedBox(height: AppSpacing.s16),
-                  _PaceBar(
-                    spent: spentFraction,
-                    cycle: cycleFraction,
-                    track: c.bgHeroOverlay,
-                    fill: onHero,
-                  ),
-                  const SizedBox(height: AppSpacing.s8),
-                  Text(_paceText, style: AppTypography.labelSmall.copyWith(color: muted)),
-                  const SizedBox(height: AppSpacing.s16),
+                  if (showPace) ...[
+                    _PaceBar(
+                      spent: spentFraction,
+                      cycle: cycleFraction,
+                      track: c.bgHeroOverlay,
+                      fill: onHero,
+                    ),
+                    const SizedBox(height: AppSpacing.s8),
+                    Text(_paceText, style: AppTypography.labelSmall.copyWith(color: muted)),
+                    const SizedBox(height: AppSpacing.s16),
+                  ],
                   _Pill(
                     color: c.bgHeroOverlay,
                     radius: AppRadius.md,
@@ -193,6 +200,9 @@ class _PaceBar extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
+          // Frame pertama di Android bisa berlebar 0; batas atas clamp tidak
+          // boleh di bawah batas bawah, jadi minimal 0.
+          final markerMaxLeft = width > 2 ? width - 2 : 0.0;
           return Stack(
             clipBehavior: Clip.none,
             children: [
@@ -221,7 +231,7 @@ class _PaceBar extends StatelessWidget {
                 ),
               ),
               Positioned(
-                left: (width * cycle.clamp(0.0, 1.0) - 1).clamp(0.0, width - 2),
+                left: (width * cycle.clamp(0.0, 1.0) - 1).clamp(0.0, markerMaxLeft),
                 top: 0,
                 width: 2,
                 height: 14,

@@ -4,8 +4,10 @@ Aplikasi Flutter untuk Moneytoring (working title). Nama package dan `applicatio
 
 ## Prasyarat
 
-- Flutter stable (dicoba dengan 3.47.9 / Dart 3.13.7)
-- Android Studio (Android SDK + emulator) untuk menjalankan dan build APK
+- Flutter stable 3.47.9 / Dart 3.13.7
+- JDK 17 dan Android SDK 36 (command line, tanpa Android Studio)
+
+Langkah lengkap menyiapkan laptop baru ada di [`docs/SETUP.md`](../docs/SETUP.md).
 
 ## Perintah sehari-hari
 
@@ -45,7 +47,13 @@ lib/
   dart run drift_dev make-migrations
   ```
 
-  Setelah itu tulis langkah migrasinya. Snapshot skema tersimpan di `drift_schemas/`.
+  Setelah itu tulis langkah `fromXToY` di `_migrationSteps` (`app_database.dart`), lalu tambahkan
+  test data di `test/drift/keuangan/migration_test.dart`. Snapshot skema tersimpan di
+  `drift_schemas/`, file langkahnya di `lib/data/db/app_database.steps.dart`.
+  Foreign key dimatikan selama migrasi dan dicek ulang sebelum commit, karena membuat ulang
+  tabel saat foreign key aktif akan menghapus baris anak lewat `ON DELETE CASCADE`.
+- **Kolom tanggal saja** (jatuh tempo, mulai mencatat) disimpan sebagai UTC tengah malam lewat
+  `LocalDate.toUtcMidnight()`; waktu transaksi tetap waktu lokal (lihat `docs/FASE1.md` §2).
 
 ## Cek di HP (debug)
 

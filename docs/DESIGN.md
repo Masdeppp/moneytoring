@@ -147,6 +147,8 @@ Di Flutter, pakai `FontFeature.tabularFigures()` untuk semua nominal supaya angk
 
 > Perbaikan layout terakhir di layar 01–03 (grid tanggal, kartu toggle, jarak baris rincian) **belum diverifikasi visual** karena kuota Figma MCP habis. Cek manual di Figma.
 
+**Implementasi Flutter (Fase 1 irisan 3)** menambah satu langkah **Saldo** di antara 01 dan 02, sehingga stepper menjadi 1/4 … 4/4. Isinya kartu per akun (CategoryTile + nama + isian saldo + switch "Hitung di Safe-to-Spend") dan chip "+ Tunai / Rekening bank / E-wallet". Layar ini belum ada di Figma; kalau desainnya dibuat, ikuti komponen layar 01. Ikon kewajiban di layar 02 memakai ikon kategorinya, bukan ikon khusus template.
+
 ## 6. Layar 04–11 (dibangun lewat plugin lokal)
 
 Spesifikasi di bawah sudah dituangkan ke plugin [tools/figma-screens-plugin](../tools/figma-screens-plugin/README.md). Kedelapan layar **sudah dibuat** di Figma (plugin dijalankan 6 Nov 2026, hasil 8/8), jadi tabel ini sekarang berfungsi sebagai dokumentasi layar. Hasilnya belum direview visual lewat MCP karena kuota habis. Skenario tanggal di semua layar: **hari ini Rabu 11 Nov**, gajian 25 Nov.

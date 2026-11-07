@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../core/model/enums.dart';
+import 'app_database.steps.dart';
 import 'tables.dart';
 
 part 'app_database.g.dart';
@@ -25,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -33,13 +34,64 @@ class AppDatabase extends _$AppDatabase {
       await m.createAll();
       await batch((b) => b.insertAll(categories, defaultCategories));
     },
-    // onUpgrade ditambahkan saat schemaVersion pertama kali naik, memakai
-    // `stepByStep` dari file hasil `dart run drift_dev make-migrations`.
+    onUpgrade: (m, from, to) async {
+      // Membuat ulang tabel saat foreign key aktif akan menghapus baris anak
+      // lewat ON DELETE CASCADE. Matikan dulu (harus di luar transaksi),
+      // lalu cek ulang sebelum commit supaya migrasi yang merusak relasi
+      // dibatalkan seluruhnya.
+      await customStatement('PRAGMA foreign_keys = OFF');
+      await transaction(() async {
+        await _migrationSteps(m, from, to);
+        final violations = await customSelect('PRAGMA foreign_key_check').get();
+        if (violations.isNotEmpty) {
+          throw StateError(
+            'Migrasi v$from → v$to merusak foreign key: '
+            '${violations.map((row) => row.data).toList()}',
+          );
+        }
+      });
+    },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },
   );
 }
+
+/// Langkah migrasi per versi. File `app_database.steps.dart` dibuat ulang oleh
+/// `dart run drift_dev make-migrations` setiap kali `schemaVersion` naik.
+final OnUpgrade _migrationSteps = stepByStep(
+  from1To2: (m, schema) async {
+    final migratedAt = Variable<DateTime>(DateTime.now());
+
+    await m.addColumn(schema.accounts, schema.accounts.includeInSafeToSpend);
+
+    // Kolom tanggal wajib tanpa default tidak bisa ditambah lewat ALTER TABLE,
+    // jadi tabelnya dibuat ulang dan baris lama diisi tanggal migrasi.
+    await m.alterTable(
+      TableMigration(
+        schema.payCycleConfigs,
+        newColumns: [
+          schema.payCycleConfigs.trackingSince,
+          schema.payCycleConfigs.bufferBasisPoints,
+        ],
+        columnTransformer: {schema.payCycleConfigs.trackingSince: migratedAt},
+      ),
+    );
+    await m.alterTable(
+      TableMigration(
+        schema.obligations,
+        newColumns: [schema.obligations.startsOn],
+        columnTransformer: {schema.obligations.startsOn: migratedAt},
+      ),
+    );
+
+    // Kolom cycle_start dibuang dan kunci unik pindah ke (obligation_id, due_date).
+    await m.alterTable(TableMigration(schema.obligationInstances));
+
+    await m.create(schema.idxObligationInstancesDue);
+    await m.create(schema.idxTransactionsObligationInstance);
+  },
+);
 
 /// Kategori bawaan yang dibuat saat database pertama kali dibuat.
 /// Merah sengaja tidak dipakai: merah hanya untuk risiko (DESIGN.md §1.3).

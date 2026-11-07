@@ -8,6 +8,8 @@ Aplikasi keuangan pribadi untuk Android. Pembedanya ada di **kepastian sampai ga
 |---|---|
 | [`docs/PRD.md`](docs/PRD.md) | Product requirements: USP, strategi ML, fitur, roadmap, model bisnis |
 | [`docs/DESIGN.md`](docs/DESIGN.md) | Design system (token Light/Dark, tipografi, komponen) dan daftar layar |
+| [`docs/FASE1.md`](docs/FASE1.md) | Rencana Fase 1 (MVP): irisan kerja, keputusan perhitungan, status |
+| [`docs/SETUP.md`](docs/SETUP.md) | Menyiapkan laptop baru: Flutter, JDK, Android SDK (tanpa Android Studio) |
 | [`app/`](app/) | Aplikasi Flutter (package `keuangan_app`) |
 | [`tools/`](tools/) | Plugin Figma lokal untuk membangun layar desain |
 

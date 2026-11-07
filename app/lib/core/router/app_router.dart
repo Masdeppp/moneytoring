@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/providers.dart';
 import '../../features/dev/component_gallery.dart';
 import '../../features/home/home_screen.dart';
+import '../../features/onboarding/presentation/onboarding_flow.dart';
 import '../../features/shell/app_shell.dart';
+import '../../features/shell/loading_screen.dart';
 import '../widgets/placeholder_screen.dart';
 
 abstract final class Routes {
@@ -11,14 +15,37 @@ abstract final class Routes {
   static const transactions = '/transactions';
   static const obligations = '/obligations';
   static const insights = '/insights';
+  static const onboarding = '/onboarding';
+
+  /// Layar kosong selama database dibuka.
+  static const loading = '/loading';
 
   /// Galeri komponen untuk mengecek token desain di HP (debug).
   static const gallery = '/dev/gallery';
 }
 
+/// Pengguna baru selalu ke onboarding; pengguna yang sudah onboarding tidak
+/// bisa kembali ke sana. Selama status belum diketahui, tampilkan layar
+/// loading supaya Beranda tidak sempat berkedip.
+@visibleForTesting
+String? onboardingRedirect(AsyncValue<bool> status, String location) {
+  final atOnboarding = location == Routes.onboarding;
+  final atLoading = location == Routes.loading;
+  final onboarded = status.value;
+  if (onboarded == null) return atLoading ? null : Routes.loading;
+  if (!onboarded) return atOnboarding ? null : Routes.onboarding;
+  return atOnboarding || atLoading ? Routes.home : null;
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
+  final refresh = ValueNotifier<int>(0);
+  ref.listen(onboardingStatusProvider, (_, _) => refresh.value++);
+
   final router = GoRouter(
     initialLocation: Routes.home,
+    refreshListenable: refresh,
+    redirect: (context, state) =>
+        onboardingRedirect(ref.read(onboardingStatusProvider), state.matchedLocation),
     routes: [
       // Empat tab utama (DESIGN.md §4 NavBar). Tiap tab menyimpan
       // posisi scroll & riwayatnya sendiri.
@@ -57,9 +84,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      GoRoute(path: Routes.onboarding, builder: (context, state) => const OnboardingFlow()),
+      GoRoute(path: Routes.loading, builder: (context, state) => const LoadingScreen()),
       GoRoute(path: Routes.gallery, builder: (context, state) => const ComponentGallery()),
     ],
   );
-  ref.onDispose(router.dispose);
+  ref.onDispose(() {
+    router.dispose();
+    refresh.dispose();
+  });
   return router;
 });

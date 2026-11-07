@@ -98,6 +98,7 @@ void main() {
             amount: 300000,
             dueDay: 20,
             categoryId: bills.id,
+            startsOn: DateTime(2026, 11, 1),
           ),
         );
     final instanceId = await db
@@ -105,7 +106,6 @@ void main() {
         .insert(
           ObligationInstancesCompanion.insert(
             obligationId: obligationId,
-            cycleStart: DateTime(2026, 10, 25),
             dueDate: DateTime(2026, 11, 20),
             expectedAmount: 300000,
           ),
@@ -134,15 +134,71 @@ void main() {
     await db
         .into(db.payCycleConfigs)
         .insert(
-          PayCycleConfigsCompanion.insert(paydayRule: PaydayRule.fixedDate, day: const Value(25)),
+          PayCycleConfigsCompanion.insert(
+            paydayRule: PaydayRule.fixedDate,
+            day: const Value(25),
+            trackingSince: DateTime(2026, 11, 7),
+          ),
         );
     await expectLater(
       db
           .into(db.payCycleConfigs)
           .insert(
-            PayCycleConfigsCompanion.insert(id: const Value(2), paydayRule: PaydayRule.lastWorkday),
+            PayCycleConfigsCompanion.insert(
+              id: const Value(2),
+              paydayRule: PaydayRule.lastWorkday,
+              trackingSince: DateTime(2026, 11, 7),
+            ),
           ),
       throwsA(isA<SqliteException>()),
     );
+  });
+
+  test('satu kewajiban hanya punya satu instance per tanggal jatuh tempo', () async {
+    final bills = await (db.select(
+      db.categories,
+    )..where((c) => c.name.equals('Tagihan & utilitas'))).getSingle();
+    final obligationId = await db
+        .into(db.obligations)
+        .insert(
+          ObligationsCompanion.insert(
+            name: 'Internet',
+            amountType: ObligationAmountType.fixed,
+            amount: 350000,
+            dueDay: 10,
+            categoryId: bills.id,
+            startsOn: DateTime(2026, 11, 1),
+          ),
+        );
+    ObligationInstancesCompanion instance() => ObligationInstancesCompanion.insert(
+      obligationId: obligationId,
+      dueDate: DateTime(2026, 11, 10),
+      expectedAmount: 350000,
+    );
+
+    await db.into(db.obligationInstances).insert(instance());
+    await expectLater(
+      db.into(db.obligationInstances).insert(instance()),
+      throwsA(isA<SqliteException>()),
+    );
+  });
+
+  test('akun baru ikut dihitung di Safe-to-Spend, buffer bawaan 5%', () async {
+    final accountId = await insertAccount();
+    final account = await (db.select(
+      db.accounts,
+    )..where((a) => a.id.equals(accountId))).getSingle();
+    expect(account.includeInSafeToSpend, isTrue);
+
+    await db
+        .into(db.payCycleConfigs)
+        .insert(
+          PayCycleConfigsCompanion.insert(
+            paydayRule: PaydayRule.lastWorkday,
+            trackingSince: DateTime(2026, 11, 7),
+          ),
+        );
+    final config = await db.select(db.payCycleConfigs).getSingle();
+    expect(config.bufferBasisPoints, 500);
   });
 }

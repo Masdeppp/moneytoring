@@ -20,6 +20,12 @@ abstract final class AppIcons {
   static const IconData octagonAlert = LucideIcons.octagonAlert;
   static const IconData info = LucideIcons.info;
 
+  // Aksi & navigasi lokal
+  static const IconData chevronLeft = LucideIcons.chevronLeft;
+  static const IconData close = LucideIcons.x;
+  static const IconData sparkles = LucideIcons.sparkles;
+  static const IconData rotateCcw = LucideIcons.rotateCcw;
+
   // Kategori bawaan
   static const IconData utensils = LucideIcons.utensils;
   static const IconData bus = LucideIcons.bus;
@@ -30,4 +36,30 @@ abstract final class AppIcons {
   static const IconData hammer = LucideIcons.hammer;
   static const IconData palette = LucideIcons.palette;
   static const IconData database = LucideIcons.database;
+
+  /// Ikon kategori dan akun disimpan di database sebagai nama Lucide
+  /// (kolom `icon`), mis. `credit-card`. Nama yang tidak dikenal memakai
+  /// lingkaran supaya tampilan tidak rusak.
+  static IconData named(String name) => _byName[name] ?? LucideIcons.circle;
+
+  static const Map<String, IconData> _byName = {
+    // Kategori bawaan (lihat `defaultCategories`)
+    'utensils': LucideIcons.utensils,
+    'bus': LucideIcons.bus,
+    'shopping-bag': LucideIcons.shoppingBag,
+    'house': LucideIcons.house,
+    'receipt': LucideIcons.receipt,
+    'credit-card': LucideIcons.creditCard,
+    'heart-pulse': LucideIcons.heartPulse,
+    'graduation-cap': LucideIcons.graduationCap,
+    'clapperboard': LucideIcons.clapperboard,
+    'ellipsis': LucideIcons.ellipsis,
+    'wallet': LucideIcons.wallet,
+    'gift': LucideIcons.gift,
+    'plus': LucideIcons.plus,
+    // Akun (lihat `AccountTypeDefaults`)
+    'banknote': LucideIcons.banknote,
+    'landmark': LucideIcons.landmark,
+    'piggy-bank': LucideIcons.piggyBank,
+  };
 }
