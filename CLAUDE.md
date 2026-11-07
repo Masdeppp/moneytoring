@@ -29,8 +29,13 @@ dibuat lewat plugin lokal di `tools/` yang dijalankan pemilik di Figma Desktop.
 flutter pub get
 flutter analyze
 flutter test                       # termasuk golden; CI memakai --exclude-tags golden
-dart format lib test               # page_width 100; *.g.dart dan lib/l10n dikecualikan di CI
 dart run build_runner build        # setelah tabel Drift berubah
+
+# Format (page_width 100) TANPA file hasil generate, sama seperti CI.
+# Jangan `dart format lib test`: itu memformat ulang *.g.dart ke lebar 100,
+# padahal build_runner menulisnya dengan lebar 80, sehingga CI gagal di
+# langkah "Generated files are committed".
+dart format $(git ls-files --cached --others --exclude-standard '*.dart' | grep -vE '\.g\.dart$|^lib/l10n/')
 dart run drift_dev make-migrations # setelah schemaVersion naik
 ```
 
