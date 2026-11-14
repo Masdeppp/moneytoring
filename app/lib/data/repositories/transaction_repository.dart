@@ -6,6 +6,73 @@ import '../../engine/forecast/risk_tier0.dart';
 import '../db/app_database.dart';
 import 'obligation_repository.dart';
 
+/// Transaksi beserta akun dan kategorinya, untuk ditampilkan di list.
+final class TransactionView {
+  const TransactionView({
+    required this.transaction,
+    required this.account,
+    this.toAccount,
+    this.category,
+  });
+
+  final TransactionRecord transaction;
+  final AccountRecord account;
+
+  /// Hanya untuk transfer.
+  final AccountRecord? toAccount;
+
+  /// Kosong untuk transfer.
+  final CategoryRecord? category;
+}
+
+/// Filter daftar transaksi (layar 07). Semua kosong berarti semua transaksi.
+final class TransactionFilter {
+  const TransactionFilter({this.type, this.accountId, this.categoryId, this.query = ''});
+
+  static const none = TransactionFilter();
+
+  final TransactionType? type;
+
+  /// Akun asal, atau akun tujuan untuk transfer.
+  final int? accountId;
+  final int? categoryId;
+
+  /// Dicari di catatan, nama kategori, dan nama akun. Kalau isinya angka saja
+  /// (mis. `25.000`), juga dicocokkan dengan nominal.
+  final String query;
+
+  /// Ada filter jenis, akun, atau kategori (pencarian tidak dihitung).
+  bool get hasSelection => type != null || accountId != null || categoryId != null;
+
+  bool get isEmpty => !hasSelection && query.trim().isEmpty;
+
+  TransactionFilter withType(TransactionType? value) =>
+      TransactionFilter(type: value, accountId: accountId, categoryId: categoryId, query: query);
+
+  TransactionFilter withAccount(int? value) =>
+      TransactionFilter(type: type, accountId: value, categoryId: categoryId, query: query);
+
+  TransactionFilter withCategory(int? value) =>
+      TransactionFilter(type: type, accountId: accountId, categoryId: value, query: query);
+
+  TransactionFilter withQuery(String value) =>
+      TransactionFilter(type: type, accountId: accountId, categoryId: categoryId, query: value);
+
+  @override
+  bool operator ==(Object other) =>
+      other is TransactionFilter &&
+      other.type == type &&
+      other.accountId == accountId &&
+      other.categoryId == categoryId &&
+      other.query == query;
+
+  @override
+  int get hashCode => Object.hash(type, accountId, categoryId, query);
+}
+
+/// Total pemasukan dan pengeluaran dalam satu rentang waktu.
+typedef CashFlowTotals = ({int income, int expense});
+
 /// Transaksi baru dari layar tambah transaksi. Dibuat lewat konstruktor per
 /// jenis supaya kombinasi kolom yang tidak valid tidak bisa terjadi.
 final class NewTransaction {
@@ -105,6 +172,110 @@ class TransactionRepository {
 
   Future<TransactionRecord> _byId(int id) =>
       (_db.select(_db.transactions)..where((t) => t.id.equals(id))).getSingle();
+
+  /// [limit] transaksi terbaru beserta akun dan kategorinya (Beranda).
+  Stream<List<TransactionView>> watchRecent({int limit = 3}) =>
+      watchFiltered(TransactionFilter.none, limit: limit);
+
+  /// Transaksi yang cocok dengan [filter], terbaru dulu, paling banyak [limit]
+  /// baris (layar 07). Layar memuat per halaman supaya riwayat bertahun-tahun
+  /// tidak dibaca sekaligus.
+  Stream<List<TransactionView>> watchFiltered(TransactionFilter filter, {required int limit}) {
+    final t = _db.transactions;
+    final account = _db.accounts;
+    final category = _db.categories;
+    final query =
+        _db.select(t).join([
+            innerJoin(account, account.id.equalsExp(t.accountId)),
+            leftOuterJoin(_toAccount, _toAccount.id.equalsExp(t.toAccountId)),
+            leftOuterJoin(category, category.id.equalsExp(t.categoryId)),
+          ])
+          ..where(_matches(filter))
+          ..orderBy([OrderingTerm.desc(t.date.unixepoch), OrderingTerm.desc(t.id)])
+          ..limit(limit);
+    return query.watch().map(
+      (rows) => [
+        for (final row in rows)
+          TransactionView(
+            transaction: row.readTable(t),
+            account: row.readTable(account),
+            toAccount: row.readTableOrNull(_toAccount),
+            category: row.readTableOrNull(category),
+          ),
+      ],
+    );
+  }
+
+  late final _toAccount = _db.alias(_db.accounts, 'to_account');
+
+  Expression<bool> _matches(TransactionFilter filter) {
+    final t = _db.transactions;
+    return Expression.and([
+      if (filter.type case final type?) t.type.equalsValue(type),
+      if (filter.accountId case final id?) t.accountId.equals(id) | t.toAccountId.equals(id),
+      if (filter.categoryId case final id?) t.categoryId.equals(id),
+      ?_search(filter.query),
+    ]);
+  }
+
+  /// Pencarian tanpa membedakan huruf besar/kecil. `%` dan `_` yang diketik
+  /// pengguna dicari apa adanya, bukan sebagai wildcard LIKE.
+  Expression<bool>? _search(String query) {
+    final text = query.trim();
+    if (text.isEmpty) return null;
+    final pattern = '%${text.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
+    Expression<bool> like(Expression<String> column) => column.like(pattern, escapeChar: r'\');
+
+    final t = _db.transactions;
+    var condition =
+        like(t.note) | like(_db.accounts.name) | like(_toAccount.name) | like(_db.categories.name);
+    final digits = text.toLowerCase().replaceAll(RegExp(r'^rp|[.\s]'), '');
+    if (RegExp(r'^\d{1,13}$').hasMatch(digits)) {
+      condition = condition | t.amount.equals(int.parse(digits));
+    }
+    return condition;
+  }
+
+  /// Total pemasukan dan pengeluaran dengan waktu di antara [from] (ikut) dan
+  /// [until] (tidak ikut), dihitung di SQL. Transfer tidak dihitung.
+  Stream<CashFlowTotals> watchTotals(DateTime from, DateTime until) {
+    final t = _db.transactions;
+    final income = t.amount.sum(filter: t.type.equalsValue(TransactionType.income));
+    final expense = t.amount.sum(filter: t.type.equalsValue(TransactionType.expense));
+    final query = _db.selectOnly(t)
+      ..addColumns([income, expense])
+      ..where(_inRange(t.date, from, until));
+    return query.watchSingle().map(
+      (row) => (income: row.read(income) ?? 0, expense: row.read(expense) ?? 0),
+    );
+  }
+
+  /// Id kategori yang pernah dipakai untuk [type], yang terakhir dipakai
+  /// paling depan (PRD §7.1 Quick Add). Pembayaran kewajiban tidak dihitung.
+  Future<List<int>> recentCategoryIds(TransactionType type) async {
+    final t = _db.transactions;
+    final lastUsed = t.date.unixepoch.max();
+    final query = _db.selectOnly(t)
+      ..addColumns([t.categoryId, lastUsed])
+      ..where(t.type.equalsValue(type) & t.categoryId.isNotNull() & t.obligationInstanceId.isNull())
+      ..groupBy([t.categoryId])
+      ..orderBy([OrderingTerm.desc(lastUsed), OrderingTerm.asc(t.categoryId)]);
+    return [for (final row in await query.get()) row.read(t.categoryId)!];
+  }
+
+  /// Akun yang terakhir dipakai untuk [type]; `null` kalau belum pernah.
+  Future<int?> lastUsedAccountId(TransactionType type) async {
+    final row =
+        await (_db.select(_db.transactions)
+              ..where((t) => t.type.equalsValue(type))
+              ..orderBy([
+                (t) => OrderingTerm.desc(t.date.unixepoch),
+                (t) => OrderingTerm.desc(t.id),
+              ])
+              ..limit(1))
+            .getSingleOrNull();
+    return row?.accountId;
+  }
 
   /// Transaksi dengan waktu di antara [from] (ikut) dan [until] (tidak ikut),
   /// terbaru dulu.

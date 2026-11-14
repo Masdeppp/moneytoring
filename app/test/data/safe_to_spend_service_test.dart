@@ -157,45 +157,183 @@ void main() {
           includeInSafeToSpend: !protected,
         );
 
-    Future<void> transfer(int from, int to, int amount) => container
-        .read(transactionRepositoryProvider)
-        .add(
-          NewTransaction.transfer(
-            amount: amount,
-            fromAccountId: from,
-            toAccountId: to,
-            date: DateTime(2026, 11, 10),
-          ),
+    Future<int> addGoal({int? accountId, int? target, LocalDate? deadline, int? perCycle}) =>
+        container.read(savingsRepositoryProvider).create((
+          name: 'Laptop',
+          targetAmount: target,
+          deadline: deadline,
+          amountPerCycle: perCycle,
+          accountId: accountId,
+        ));
+
+    Future<void> deposit(int goal, int amount, {int? from, DateTime? at}) => container
+        .read(savingsRepositoryProvider)
+        .contribute(
+          goalId: goal,
+          amount: amount,
+          date: at ?? DateTime(2026, 11, 10),
+          fromAccountId: from,
         );
 
-    test('transfer ke rekening yang dikecualikan mengurangi sisa target', () async {
+    test('setoran ke rekening yang dikecualikan mengurangi sisa target', () async {
       final seeded = await seedLampiranA();
       final savingsAccount = await addSavingsAccount(protected: true);
-      await container
-          .read(savingsRepositoryProvider)
-          .setTarget(amountPerCycle: 500000, accountId: savingsAccount);
+      final goal = await addGoal(accountId: savingsAccount, perCycle: 500000);
 
       final before = (await service.compute(today))!.safeToSpend;
       expect(before.savingsReserved, 500000);
 
-      await transfer(seeded.bca, savingsAccount, 200000);
+      await deposit(goal, 200000, from: seeded.bca);
       final after = (await service.compute(today))!.safeToSpend;
       expect(after.savingsReserved, 300000);
       expect(after.availableBalance, 2800000);
       expect(after.amount, before.amount, reason: 'menabung tidak mengubah Safe-to-Spend');
     });
 
-    test('rekening yang ikut Safe-to-Spend: target tetap dicadangkan penuh', () async {
-      final seeded = await seedLampiranA();
-      final savingsAccount = await addSavingsAccount(protected: false);
-      await container
-          .read(savingsRepositoryProvider)
-          .setTarget(amountPerCycle: 500000, accountId: savingsAccount);
+    test('tanpa rekening: setoran siklus lalu tetap disisihkan dari saldo', () async {
+      await seedLampiranA();
+      final goal = await addGoal(perCycle: 500000);
+      await deposit(goal, 400000, at: DateTime(2026, 10, 10)); // siklus lalu
 
-      await transfer(seeded.bca, savingsAccount, 200000);
-      final result = (await service.compute(today))!.safeToSpend;
-      expect(result.savingsReserved, 500000);
-      expect(result.availableBalance, 3000000);
+      final before = (await service.compute(today))!.safeToSpend;
+      // 400 rb yang sudah disisihkan + 500 rb setoran siklus ini.
+      expect(before.savingsReserved, 900000);
+      expect(before.availableBalance, 3000000);
+
+      await deposit(goal, 200000);
+      final after = (await service.compute(today))!.safeToSpend;
+      expect(after.savingsReserved, 900000);
+      expect(after.amount, before.amount, reason: 'menabung tidak mengubah Safe-to-Spend');
+    });
+
+    test('bertenggat: kebutuhan per siklus dari sisa target dan siklus tersisa', () async {
+      await seedLampiranA();
+      final savingsAccount = await addSavingsAccount(protected: true);
+      await addGoal(accountId: savingsAccount, target: 6000000, deadline: d(2027, 4, 20));
+
+      // 6 siklus: 25 Okt sampai siklus 25 Mar yang memuat 20 Apr.
+      expect((await service.compute(today))!.safeToSpend.savingsReserved, 1000000);
+    });
+
+    test('target yang diarsipkan tidak dicadangkan lagi', () async {
+      await seedLampiranA();
+      final goal = await addGoal(perCycle: 500000);
+      await container.read(savingsRepositoryProvider).archive(goal);
+      expect((await service.compute(today))!.safeToSpend.savingsReserved, 0);
+    });
+  });
+
+  group('sisihan gaji', () {
+    late int bca;
+    late int food;
+
+    /// Gaji Rp 2.000.000 tiap tanggal 25; mulai mencatat 25 Okt dengan saldo
+    /// BCA Rp 2.000.000. Sisihan 10% (Rp 200.000) dipasang 26 Okt.
+    Future<void> seed() async {
+      await container
+          .read(payCycleRepositoryProvider)
+          .save(rule: rule, expectedIncome: 2000000, trackingSince: d(2026, 10, 25));
+      bca = await container
+          .read(accountRepositoryProvider)
+          .create(name: 'BCA', type: AccountType.bank, icon: 'landmark', initialBalance: 2000000);
+      food = (await container.read(categoryRepositoryProvider).active())
+          .firstWhere((c) => c.name == 'Makan & minum')
+          .id;
+      await container.read(salaryShareServiceProvider).setShare(1000, today: d(2026, 10, 26));
+    }
+
+    Future<void> spend(int amount, DateTime at) => container
+        .read(transactionRepositoryProvider)
+        .add(NewTransaction.expense(amount: amount, accountId: bca, categoryId: food, date: at));
+
+    Future<List<int>> saved() async => [
+      for (final contribution in await db.select(db.goalContributions).get()) contribution.amount,
+    ];
+
+    test('dikunci dari Safe-to-Spend sepanjang siklus berjalan', () async {
+      await seed();
+      final snapshot = (await service.compute(d(2026, 11, 11)))!.safeToSpend;
+
+      expect(snapshot.savingsReserved, 200000);
+      // Dana cadangan tetap ada: 5% × (2.000.000 − 200.000) = 90.000.
+      expect(snapshot.buffer, 90000);
+      expect(snapshot.amount, 1710000);
+    });
+
+    test('saat gajian, sisihan yang tersisa ditabung dan tetap dikunci', () async {
+      await seed();
+      await spend(1700000, DateTime(2026, 11, 1, 12));
+      final snapshot = (await service.compute(d(2026, 11, 25)))!.safeToSpend;
+
+      final contribution = (await db.select(db.goalContributions).get()).single;
+      expect(contribution.amount, 200000);
+      expect(LocalDate.fromDateTime(contribution.date), d(2026, 11, 24));
+      // Saldo 300.000: 200.000 tabungan + 200.000 sisihan siklus baru dikunci.
+      expect(snapshot.availableBalance, 300000);
+      expect(snapshot.savingsReserved, 400000);
+
+      // Ditabung sekali saja, walau belanja siklus lalu dicatat belakangan.
+      await spend(50000, DateTime(2026, 11, 24, 20));
+      await service.compute(d(2026, 11, 26));
+      expect(await saved(), [200000]);
+    });
+
+    test('belanja yang memakai sisihan mengurangi yang ditabung', () async {
+      await seed();
+      await spend(1900000, DateTime(2026, 11, 1, 12));
+      await service.compute(d(2026, 11, 25));
+      expect(await saved(), [100000]);
+    });
+
+    test('kewajiban yang jatuh tempo di hari gajian didahulukan', () async {
+      await seed();
+      final obligations = container.read(obligationRepositoryProvider);
+      final housing = (await container.read(categoryRepositoryProvider).active())
+          .firstWhere((c) => c.name == 'Tempat tinggal')
+          .id;
+      await obligations.create(
+        name: 'Kos',
+        amountType: ObligationAmountType.fixed,
+        amount: 150000,
+        dueDay: 25,
+        categoryId: housing,
+        startsOn: d(2026, 10, 26),
+      );
+      await obligations.ensureInstances(
+        calculator: PayCycleCalculator(rule),
+        today: d(2026, 11, 25),
+      );
+      await spend(1700000, DateTime(2026, 11, 1, 12));
+      // Kos 25 Nov dicadangkan dari siklus yang berakhir 24 Nov, lalu dibayar
+      // pagi hari gajian: uangnya belum keluar saat siklus itu berakhir.
+      final kos = (await db.select(db.obligationInstances).get()).singleWhere(
+        (i) => LocalDate.fromDateTime(i.dueDate) == d(2026, 11, 25),
+      );
+      await obligations.recordPayment(
+        instanceId: kos.id,
+        accountId: bca,
+        amount: 150000,
+        date: DateTime(2026, 11, 25, 9),
+      );
+
+      await service.compute(d(2026, 11, 25));
+      expect(await saved(), [150000]);
+    });
+
+    test('persen 0 menghentikan sisihan; lepas semua menghapus targetnya', () async {
+      await seed();
+      await spend(1700000, DateTime(2026, 11, 1, 12));
+      await service.compute(d(2026, 11, 25));
+      final salary = container.read(salaryShareServiceProvider);
+
+      await salary.setShare(0, today: d(2026, 11, 26));
+      var snapshot = (await service.compute(d(2026, 11, 26)))!.safeToSpend;
+      expect(snapshot.savingsReserved, 200000, reason: 'tabungan yang sudah ada tetap dikunci');
+
+      await salary.release();
+      snapshot = (await service.compute(d(2026, 11, 26)))!.safeToSpend;
+      expect(snapshot.savingsReserved, 0);
+      expect(await db.select(db.savingsGoals).get(), isEmpty);
     });
   });
 

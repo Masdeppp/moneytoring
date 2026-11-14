@@ -145,11 +145,60 @@ class ObligationInstances extends Table {
   ];
 }
 
-@DataClassName('SavingsTargetRecord')
-class SavingsTargets extends Table {
+/// Target tabungan bernama (PRD v0.3 §7.3, FASE1 irisan 7). Menggantikan
+/// target tunggal per siklus (`savings_targets`, v1–v2). (v3)
+///
+/// Kebutuhan per siklus dihitung dari [targetAmount] + [deadline], atau
+/// memakai [amountPerCycle] untuk target tanpa tenggat.
+@DataClassName('SavingsGoalRecord')
+class SavingsGoals extends Table {
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get amountPerCycle => integer()();
+  TextColumn get name => text().withLength(min: 1, max: 40)();
+
+  /// Nominal yang ingin dikumpulkan; kosong untuk tabungan rutin tanpa batas.
+  IntColumn get targetAmount => integer().nullable().check(targetAmount.isBiggerThanValue(0))();
+
+  /// Tenggat (tanggal saja, UTC tengah malam). Hanya bersama [targetAmount].
+  DateTimeColumn get deadline => dateTime().nullable()();
+
+  /// Setoran per siklus untuk target tanpa tenggat.
+  IntColumn get amountPerCycle => integer().nullable().check(amountPerCycle.isBiggerThanValue(0))();
+
+  /// Rekening tujuan. Setoran ke rekening yang dikecualikan dari
+  /// Safe-to-Spend memindahkan uang keluar dari jatah; tanpa rekening, uangnya
+  /// tetap di saldo tapi disisihkan.
   IntColumn get accountId => integer().nullable().references(Accounts, #id)();
+  TextColumn get icon => text().withDefault(const Constant('piggy-bank'))();
+  TextColumn get tone => textEnum<Tone>().withDefault(const Constant('brand'))();
+
+  /// Selesai (dananya dipakai) atau dihentikan; tidak lagi dicadangkan.
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
+
+  /// Target sistem "Sisa gaji": persen perkiraan gaji yang disisihkan tiap
+  /// siklus, dalam basis poin (1000 = 10%). Kosong untuk target biasa. (v4)
+  IntColumn get salaryBasisPoints =>
+      integer().nullable().check(salaryBasisPoints.isBetweenValues(0, 10000))();
+
+  /// Hari terakhir siklus yang sisihan gajinya sudah ditabung (tanggal saja,
+  /// UTC tengah malam). Hanya untuk target "Sisa gaji". (v4)
+  DateTimeColumn get settledThrough => dateTime().nullable()();
+}
+
+/// Setoran ke target tabungan. (v3)
+@DataClassName('GoalContributionRecord')
+@TableIndex(name: 'idx_goal_contributions_goal', columns: {#goalId})
+class GoalContributions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get goalId => integer().references(SavingsGoals, #id, onDelete: KeyAction.cascade)();
+  IntColumn get amount => integer().check(amount.isBiggerThanValue(0))();
+
+  /// Tanggal saja (UTC tengah malam).
+  DateTimeColumn get date => dateTime()();
+
+  /// Transfer ke rekening tujuan. Setoran ikut terhapus kalau transfernya
+  /// dihapus dari layar Transaksi.
+  IntColumn get transactionId =>
+      integer().nullable().references(Transactions, #id, onDelete: KeyAction.cascade)();
 }
 
 @DataClassName('AlertRecord')

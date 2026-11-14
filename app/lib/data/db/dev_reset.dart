@@ -7,10 +7,11 @@ import 'app_database.dart';
 Future<void> resetUserData(AppDatabase db) => db.transaction(() async {
   // Urutan mengikuti foreign key: anak dulu, induk belakangan.
   for (final table in <TableInfo<Table, Object?>>[
+    db.goalContributions,
     db.transactions,
     db.obligationInstances,
     db.obligations,
-    db.savingsTargets,
+    db.savingsGoals,
     db.alerts,
     db.alertThresholds,
     db.accounts,

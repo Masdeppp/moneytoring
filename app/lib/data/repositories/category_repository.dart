@@ -22,6 +22,15 @@ class CategoryRepository {
 
   Stream<List<CategoryRecord>> watchActive({CategoryType? type}) => _active(type).watch();
 
+  /// Semua kategori, termasuk yang diarsipkan, supaya transaksi dan kewajiban
+  /// lama tetap tampil dengan ikon dan warnanya.
+  Stream<List<CategoryRecord>> watchAll() =>
+      (_db.select(_db.categories)..orderBy([
+            (c) => OrderingTerm(expression: c.sortOrder),
+            (c) => OrderingTerm(expression: c.id),
+          ]))
+          .watch();
+
   Future<int> create({
     required String name,
     required CategoryType type,
@@ -43,6 +52,23 @@ class CategoryRepository {
             sortOrder: Value((row.read(max) ?? -1) + 1),
           ),
         );
+  }
+
+  /// Ubah nama, ikon, atau warna. Jenisnya tetap, supaya transaksi lama tidak
+  /// berpindah antara pemasukan dan pengeluaran.
+  Future<void> update(int id, {String? name, String? icon, Tone? tone}) async {
+    final trimmed = name?.trim();
+    if (trimmed != null && trimmed.isEmpty) {
+      throw ArgumentError.value(name, 'name', 'tidak boleh kosong');
+    }
+    final updated = await (_db.update(_db.categories)..where((c) => c.id.equals(id))).write(
+      CategoriesCompanion(
+        name: Value.absentIfNull(trimmed),
+        icon: Value.absentIfNull(icon),
+        tone: Value.absentIfNull(tone),
+      ),
+    );
+    if (updated == 0) throw StateError('Kategori $id tidak ditemukan');
   }
 
   /// Kategori diarsipkan, bukan dihapus, supaya transaksi lama tetap berkategori.

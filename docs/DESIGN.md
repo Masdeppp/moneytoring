@@ -24,10 +24,10 @@
 | Family | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950 |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | **brand** | EAFBF4 | CDF5E3 | 9DEACB | 5FD8AE | 2CC290 | 12A679 | 0A8763 | 0B6C52 | 0D5643 | 0B4738 | 04281F |
-| **neutral** (0 = FFFFFF) | F6F8F7 | EDF1EF | DCE2DF | BFC8C4 | 919D98 | 6A7671 | 4E5955 | 39423F | 242B29 | 161B1A | 0C100F |
-| **amber** | FFF7E6 | FEEBC2 | – | – | F7BD4F | F0A020 | CC8008 | 9E6106 | – | 3A2604 | – |
+| **neutral** (0 = FFFFFF) | F6F8F7 | EDF1EF | DCE2DF | BFC8C4 | 919D98 | 67736E | 4E5955 | 39423F | 242B29 | 161B1A | 0C100F |
+| **amber** | FFF7E6 | FEEBC2 | – | – | F7BD4F | F0A020 | CC8008 | 9E6106 | 7B4C05 | 3A2604 | – |
 | **red** | FEF1F1 | FDDCDC | – | – | F27A7D | E34A4F | C8323A | A1252C | – | 3B1215 | – |
-| **blue** | EEF5FF | DCE9FE | – | – | 6FA0F5 | 3B7DF0 | 2563D6 | – | – | 10264D | – |
+| **blue** | EEF5FF | DCE9FE | – | – | 6FA0F5 | 3B7DF0 | 2461D2 | – | – | 10264D | – |
 | **violet** | F4F0FF | E6DEFF | – | – | A48BF0 | 7C5CE6 | 6544CC | – | – | 261A52 | – |
 
 Alpha: `alpha/white-72` = #FFFFFF @72% · `alpha/white-16` = #FFFFFF @16% · `alpha/scrim` = #0C100F @48%
@@ -46,7 +46,7 @@ Nama Dart mengikuti code syntax di Figma: `AppColors.<camelCase>`, mis. `bg/hero
 | `bg/brand-pressed` | brand/700 | brand/300 | State ditekan |
 | `bg/brand-subtle` | brand/50 | brand/950 | Tombol tonal, chip terpilih |
 | `bg/hero-safe` | brand/800 | brand/900 | Kartu Safe-to-Spend: Aman |
-| `bg/hero-warning` | amber/700 | amber/900 | Kartu Safe-to-Spend: Waspada |
+| `bg/hero-warning` | amber/800 | amber/900 | Kartu Safe-to-Spend: Waspada |
 | `bg/hero-danger` | red/700 | red/900 | Kartu Safe-to-Spend: Berisiko |
 | `bg/hero-overlay` | alpha/white-16 | alpha/white-16 | Elemen di atas kartu hero |
 | `bg/warning-subtle` | amber/50 | amber/900 | AlertBanner Warning |
@@ -60,12 +60,12 @@ Nama Dart mengikuti code syntax di Figma: `AppColors.<camelCase>`, mis. `bg/hero
 | `text/on-hero` | neutral/0 | neutral/0 | Teks di kartu hero |
 | `text/on-hero-muted` | alpha/white-72 | alpha/white-72 | Teks sekunder di kartu hero |
 | `text/brand` | brand/700 | brand/300 | Link, aksi teks |
-| `text/income` | brand/600 | brand/400 | Nominal pemasukan |
+| `text/income` | brand/700 | brand/400 | Nominal pemasukan |
 | `text/warning` | amber/700 | amber/400 | |
 | `text/danger` | red/600 | red/400 | |
 | `text/info` | blue/600 | blue/400 | |
 | `border/default` | neutral/200 | neutral/800 | Border kartu |
-| `border/strong` | neutral/300 | neutral/700 | Border chip/input |
+| `border/strong` | `#86908C` | `#6C7572` | Border chip/input (minimal 3:1, WCAG 1.4.11) |
 | `border/focus` | brand/600 | brand/400 | Input aktif, chip terpilih |
 | `icon/primary` | neutral/800 | neutral/100 | |
 | `icon/secondary` | neutral/500 | neutral/400 | Ikon nav tidak aktif |
@@ -73,7 +73,11 @@ Nama Dart mengikuti code syntax di Figma: `AppColors.<camelCase>`, mis. `bg/hero
 | `icon/on-hero` | neutral/0 | neutral/0 | |
 | `status/safe` · `status/warning` · `status/danger` | brand/500 · amber/500 · red/500 | brand/400 · amber/400 · red/400 | Indikator risiko |
 | `tone/{brand,amber,blue,violet,red,neutral}/bg` | x/100 (neutral/100) | x/950 atau x/900 (neutral/800) | Tile kategori, badge |
-| `tone/{…}/fg` | brand/700, amber/700, blue/600, violet/600, red/600, neutral/600 | x/300 atau x/400 (neutral/300) | Ikon/teks di tile & badge |
+| `tone/{…}/fg` | brand/700, amber/800, blue/600, violet/600, red/700, neutral/600 | x/300 atau x/400 (neutral/300) | Ikon/teks di tile & badge |
+
+Kontras semua pasangan teks/latar Light & Dark lulus WCAG AA (88 pasangan, `replica/design/tokens.json`,
+dicek 9 Nov 2026). Nilai neutral/500, amber/800, blue/600, text/income, tone fg amber/red, dan
+border/strong diubah untuk itu; variabel Figma belum ikut diperbarui.
 
 ### 1.3 Aturan pemakaian warna
 - **Pengeluaran ditulis dengan warna teks netral, bukan merah.** Merah hanya untuk risiko nyata (kewajiban terancam). Kalau setiap pengeluaran merah, pengguna merasa dihakimi dan alert berisiko diabaikan.

@@ -39,8 +39,9 @@ class _AhaStepState extends ConsumerState<AhaStep> {
     } on Object catch (error) {
       if (!mounted) return;
       setState(() => _saving = false);
+      debugPrint('Onboarding gagal disimpan: $error');
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Gagal menyimpan: $error')));
+          .showSnackBar(const SnackBar(content: Text('Belum tersimpan. Coba sekali lagi.')));
     }
   }
 

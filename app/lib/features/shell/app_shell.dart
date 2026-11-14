@@ -1,9 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_icons.dart';
-import '../../core/theme/app_tokens.dart';
-import '../../core/theme/theme_context.dart';
+import '../transactions/presentation/transaction_sheet.dart';
 
 /// Kerangka layar utama: NavigationBar 4 tab + FAB tambah transaksi.
 class AppShell extends StatelessWidget {
@@ -27,7 +28,7 @@ class AppShell extends StatelessWidget {
       floatingActionButton: showFab
           ? FloatingActionButton(
               tooltip: 'Tambah transaksi',
-              onPressed: () => _showAddTransactionSheet(context),
+              onPressed: () => unawaited(showTransactionSheet(context)),
               child: const Icon(AppIcons.plus),
             )
           : null,
@@ -41,27 +42,6 @@ class AppShell extends StatelessWidget {
         destinations: [
           for (final d in _destinations) NavigationDestination(icon: Icon(d.icon), label: d.label),
         ],
-      ),
-    );
-  }
-
-  void _showAddTransactionSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.s24, 0, AppSpacing.s24, AppSpacing.s32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Tambah transaksi', style: context.textStyles.headlineSmall),
-            const SizedBox(height: AppSpacing.s8),
-            Text(
-              'Keypad, kategori, dan "Sisa aman setelah ini" dibangun di Fase 1.',
-              style: context.textStyles.bodyMedium?.copyWith(color: context.colors.textSecondary),
-            ),
-          ],
-        ),
       ),
     );
   }

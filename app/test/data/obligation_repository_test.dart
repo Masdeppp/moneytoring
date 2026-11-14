@@ -9,6 +9,7 @@ import 'package:keuangan_app/data/repositories/obligation_repository.dart';
 import 'package:keuangan_app/data/repositories/transaction_repository.dart';
 import 'package:keuangan_app/engine/common/local_date.dart';
 import 'package:keuangan_app/engine/cycle/pay_cycle.dart';
+import 'package:keuangan_app/features/obligations/application/obligation_timeline.dart';
 
 LocalDate d(int y, int m, int day) => LocalDate(y, m, day);
 
@@ -227,6 +228,147 @@ void main() {
       expect((await obligations.unpaidThrough(nextPayday)).map((due) => due.obligationName), [
         'Listrik',
       ]);
+    });
+  });
+
+  group('layar Kewajiban: timeline siklus dan ubah kewajiban', () {
+    late int kosId;
+    late int internetId;
+    late int listrikId;
+    final cycle = calculator.cycleContaining(today); // 25 Okt – 24 Nov
+
+    Future<ObligationInstanceRecord> instanceOf(int obligationId, LocalDate due) =>
+        (db.select(db.obligationInstances)..where(
+              (i) => i.obligationId.equals(obligationId) & i.dueDate.equals(due.toUtcMidnight()),
+            ))
+            .getSingle();
+
+    Future<void> pay(int obligationId, LocalDate due, int amount, DateTime at) async =>
+        obligations.recordPayment(
+          instanceId: (await instanceOf(obligationId, due)).id,
+          accountId: bca,
+          amount: amount,
+          date: at,
+        );
+
+    Future<List<String>> datesOf(int obligationId) async => [
+      for (final i
+          in await (db.select(db.obligationInstances)
+                ..where((i) => i.obligationId.equals(obligationId))
+                ..orderBy([(i) => OrderingTerm(expression: i.dueDate)]))
+              .get())
+        LocalDate.fromDateTime(i.dueDate).toString(),
+    ];
+
+    setUp(() async {
+      kosId = await create('Kos', 1000000, 1);
+      internetId = await create('Internet', 300000, 9);
+      listrikId = await create('Listrik', 350000, 20, amountType: ObligationAmountType.estimated);
+      await obligations.ensureInstances(calculator: calculator, today: today);
+      // Siklus lalu: Kos dan Listrik lunas, Internet 9 Okt belum.
+      await pay(kosId, d(2026, 10, 1), 1000000, DateTime(2026, 10, 1, 9));
+      await pay(listrikId, d(2026, 10, 20), 350000, DateTime(2026, 10, 20, 9));
+      // Siklus ini: Kos lunas 2 Nov dari BCA.
+      await pay(kosId, d(2026, 11, 1), 1000000, DateTime(2026, 11, 2, 19));
+    });
+
+    test('jatuh tempo siklus ini ditambah tunggakan siklus lalu', () async {
+      final dues = await obligations.watchCycle(cycle).first;
+      expect(dues.map((due) => '${due.obligationName} ${due.dueDate}'), [
+        'Internet 2026-10-09',
+        'Kos 2026-11-01',
+        'Internet 2026-11-09',
+        'Listrik 2026-11-20',
+      ]);
+      final kos = dues[1];
+      expect(kos.status, ObligationStatus.paid);
+      expect(kos.lastPaidAt?.toLocal(), DateTime(2026, 11, 2, 19));
+      expect(kos.lastPaidAccountName, 'BCA');
+      expect(dues.first.lastPaidAt, isNull);
+    });
+
+    test('dikelompokkan terlambat / akan datang / lunas dengan angka progres', () async {
+      final dues = await obligations.watchCycle(cycle).first;
+      final timeline = ObligationTimeline(dues, cycle: cycle, today: today);
+
+      expect(timeline.late.map((due) => due.dueDate), [d(2026, 10, 9), d(2026, 11, 9)]);
+      expect(timeline.upcoming.single.obligationName, 'Listrik');
+      expect(timeline.done.single.obligationName, 'Kos');
+      expect(timeline.count, 4);
+      expect(timeline.paidCount, 1);
+      // Tunggakan 9 Okt bukan milik siklus ini.
+      expect(timeline.perCycle, 1000000 + 300000 + 350000);
+      expect(timeline.paid, 1000000);
+      expect(timeline.remaining, 300000 + 300000 + 350000);
+      expect(timeline.unrecorded?.dueDate, d(2026, 10, 9));
+
+      // Sisa = yang dicadangkan Safe-to-Spend.
+      final reserved = await obligations.unpaidThrough(nextPayday);
+      expect(timeline.remaining, reserved.fold<int>(0, (sum, due) => sum + due.remaining));
+    });
+
+    test('ubah nominal: jatuh tempo yang belum lunas ikut, yang lunas tidak', () async {
+      await pay(internetId, d(2026, 11, 9), 250000, DateTime(2026, 11, 9, 8));
+      await obligations.update(
+        internetId,
+        name: 'Internet rumah',
+        amountType: ObligationAmountType.fixed,
+        amount: 250000,
+        dueDay: 9,
+        categoryId: billsId,
+        today: today,
+      );
+
+      final october = await instanceOf(internetId, d(2026, 10, 9));
+      final november = await instanceOf(internetId, d(2026, 11, 9));
+      expect(october.expectedAmount, 250000);
+      expect(october.status, ObligationStatus.pending);
+      // Cicilan 250 rb kini menutup nominal baru.
+      expect(november.status, ObligationStatus.paid);
+      expect((await instanceOf(kosId, d(2026, 11, 1))).expectedAmount, 1000000);
+      expect((await obligations.watchCycle(cycle).first).first.obligationName, 'Internet rumah');
+    });
+
+    test(
+      'ubah tanggal: jatuh tempo mendatang pindah, bulan yang lunas tidak ditagih lagi',
+      () async {
+        Future<void> moveTo(int id, String name, int amount, int dueDay) => obligations.update(
+          id,
+          name: name,
+          amountType: ObligationAmountType.fixed,
+          amount: amount,
+          dueDay: dueDay,
+          categoryId: billsId,
+          today: today,
+        );
+
+        // Listrik 20 Nov belum dibayar → pindah ke 22 Nov.
+        await moveTo(listrikId, 'Listrik', 350000, 22);
+        // Kos November sudah lunas → tanggal 15 baru berlaku Desember.
+        await moveTo(kosId, 'Kos', 1000000, 15);
+        await obligations.ensureInstances(calculator: calculator, today: today);
+
+        expect(await datesOf(listrikId), ['2026-10-20', '2026-11-22']);
+        expect(await datesOf(kosId), ['2026-10-01', '2026-11-01']);
+        final kos = await (db.select(db.obligations)..where((o) => o.id.equals(kosId))).getSingle();
+        expect(LocalDate.fromDateTime(kos.startsOn), d(2026, 12, 1));
+      },
+    );
+
+    test('validasi saat mengubah kewajiban', () {
+      Future<void> update({String name = 'Kos', int amount = 1, int dueDay = 1}) =>
+          obligations.update(
+            kosId,
+            name: name,
+            amountType: ObligationAmountType.fixed,
+            amount: amount,
+            dueDay: dueDay,
+            categoryId: billsId,
+            today: today,
+          );
+      expect(() => update(name: ' '), throwsArgumentError);
+      expect(() => update(amount: 0), throwsArgumentError);
+      expect(() => update(dueDay: 0), throwsRangeError);
     });
   });
 }

@@ -52,6 +52,28 @@ class AccountRepository {
       .where((entry) => entry.account.includeInSafeToSpend)
       .fold<int>(0, (sum, entry) => sum + entry.balance);
 
+  /// Total saldo akun aktif yang dihitung di Safe-to-Spend, hanya dari
+  /// transaksi sebelum [before]. Dipakai untuk menutup siklus yang sudah lewat.
+  Future<int> spendableBalanceBefore(DateTime before) async {
+    final row = await _db
+        .customSelect(
+          '''
+          SELECT COALESCE(SUM(a.initial_balance
+            + COALESCE((SELECT SUM(CASE t.type WHEN 'income' THEN t.amount ELSE -t.amount END)
+                        FROM transactions t
+                        WHERE t.account_id = a.id AND unixepoch(t.date) < unixepoch(?1)), 0)
+            + COALESCE((SELECT SUM(t.amount) FROM transactions t
+                        WHERE t.type = 'transfer' AND t.to_account_id = a.id
+                          AND unixepoch(t.date) < unixepoch(?1)), 0)), 0) AS balance
+          FROM accounts a
+          WHERE a.archived = 0 AND a.include_in_safe_to_spend = 1''',
+          variables: [Variable<DateTime>(before)],
+          readsFrom: {_db.accounts, _db.transactions},
+        )
+        .getSingle();
+    return row.read<int>('balance');
+  }
+
   Future<int> create({
     required String name,
     required AccountType type,
@@ -80,6 +102,7 @@ class AccountRepository {
   Future<void> update(
     int id, {
     String? name,
+    AccountType? type,
     String? icon,
     Tone? tone,
     int? initialBalance,
@@ -88,6 +111,7 @@ class AccountRepository {
     final updated = await (_db.update(_db.accounts)..where((a) => a.id.equals(id))).write(
       AccountsCompanion(
         name: name == null ? const Value.absent() : Value(_checkName(name)),
+        type: Value.absentIfNull(type),
         icon: Value.absentIfNull(icon),
         tone: Value.absentIfNull(tone),
         initialBalance: Value.absentIfNull(initialBalance),
@@ -96,6 +120,23 @@ class AccountRepository {
     );
     if (updated == 0) throw StateError('Akun $id tidak ditemukan');
   }
+
+  /// Menyamakan saldo akun dengan [actualBalance] (saldo sebenarnya di bank
+  /// atau dompet). Selisihnya masuk ke saldo awal, bukan menjadi transaksi,
+  /// supaya total pemasukan dan pengeluaran tidak ikut berubah.
+  ///
+  /// Mengembalikan selisihnya (positif kalau saldo bertambah).
+  Future<int> adjustBalance(int id, int actualBalance) => _db.transaction(() async {
+    final entry = (await balances(includeArchived: true))
+        .where((entry) => entry.account.id == id)
+        .firstOrNull;
+    if (entry == null) throw StateError('Akun $id tidak ditemukan');
+    final difference = actualBalance - entry.balance;
+    if (difference != 0) {
+      await update(id, initialBalance: entry.account.initialBalance + difference);
+    }
+    return difference;
+  });
 
   /// Akun diarsipkan, bukan dihapus, supaya riwayat transaksinya tetap utuh.
   Future<void> archive(int id) => (_db.update(
