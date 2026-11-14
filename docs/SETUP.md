@@ -39,6 +39,10 @@ git -C /c/dev/flutter checkout 3.47.9
 Pemanggilan pertama mengunduh Dart SDK dan engine (beberapa menit). Selesai kalau
 `--version` mencetak `Flutter 3.47.9` dan `Dart 3.13.7`.
 
+CI (`.github/workflows/app-ci.yml`) memakai versi yang sama lewat `flutter-version`. Kalau Flutter
+dinaikkan, ubah keduanya sekaligus. Mulai 3.50, `package:flutter/material.dart` ditandai usang
+(diganti `package:material_ui`), jadi kenaikan versi itu perlu migrasi impor juga.
+
 ## 2. JDK 17
 
 ```powershell
