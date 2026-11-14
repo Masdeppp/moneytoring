@@ -32,7 +32,8 @@ void main() {
   test('warna kartu hero mengikuti tingkat risiko', () {
     const c = AppColors.light;
     expect(c.heroFor(RiskLevel.safe), const Color(0xFF0D5643));
-    expect(c.heroFor(RiskLevel.warning), const Color(0xFF9E6106));
+    // amber/800: amber/700 tidak cukup kontras untuk teks putih 72% (WCAG AA).
+    expect(c.heroFor(RiskLevel.warning), const Color(0xFF7B4C05));
     expect(c.heroFor(RiskLevel.danger), const Color(0xFFA1252C));
   });
 

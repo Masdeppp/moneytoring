@@ -23,7 +23,9 @@ abstract final class Palette {
   static const neutral200 = Color(0xFFDCE2DF);
   static const neutral300 = Color(0xFFBFC8C4);
   static const neutral400 = Color(0xFF919D98);
-  static const neutral500 = Color(0xFF6A7671);
+  // Sedikit lebih gelap dari desain awal (#6A7671) supaya teks tersier di
+  // kanvas lulus WCAG AA (4,6:1). Diperiksa 9 Nov 2026.
+  static const neutral500 = Color(0xFF67736E);
   static const neutral600 = Color(0xFF4E5955);
   static const neutral700 = Color(0xFF39423F);
   static const neutral800 = Color(0xFF242B29);
@@ -36,6 +38,10 @@ abstract final class Palette {
   static const amber500 = Color(0xFFF0A020);
   static const amber600 = Color(0xFFCC8008);
   static const amber700 = Color(0xFF9E6106);
+
+  /// Kartu Waspada (terang) dan ikon/teks tone amber: amber/700 tidak cukup
+  /// kontras untuk teks putih 72% dan badge.
+  static const amber800 = Color(0xFF7B4C05);
   static const amber900 = Color(0xFF3A2604);
 
   static const red50 = Color(0xFFFEF1F1);
@@ -50,7 +56,8 @@ abstract final class Palette {
   static const blue100 = Color(0xFFDCE9FE);
   static const blue400 = Color(0xFF6FA0F5);
   static const blue500 = Color(0xFF3B7DF0);
-  static const blue600 = Color(0xFF2563D6);
+  // #2563D6 → #2461D2 supaya badge biru lulus AA di blue/100.
+  static const blue600 = Color(0xFF2461D2);
   static const blue900 = Color(0xFF10264D);
 
   static const violet50 = Color(0xFFF4F0FF);
@@ -59,6 +66,10 @@ abstract final class Palette {
   static const violet500 = Color(0xFF7C5CE6);
   static const violet600 = Color(0xFF6544CC);
   static const violet900 = Color(0xFF261A52);
+
+  /// Garis tepi input dan chip: minimal 3:1 terhadap latarnya (WCAG 1.4.11).
+  static const borderStrongLight = Color(0xFF86908C);
+  static const borderStrongDark = Color(0xFF6C7572);
 
   /// `alpha/white-72`: putih 72%.
   static const white72 = Color(0xB8FFFFFF);

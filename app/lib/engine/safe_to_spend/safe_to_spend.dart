@@ -32,10 +32,6 @@ final class ObligationDue {
 int reservedForObligations(Iterable<ObligationDue> dues, LocalDate nextPayday) =>
     dues.where((due) => due.dueDate <= nextPayday).fold(0, (sum, due) => sum + due.remaining);
 
-/// Sisa target tabungan siklus ini yang belum disisihkan.
-int remainingSavingsTarget({required int targetPerCycle, required int savedThisCycle}) =>
-    math.max(0, targetPerCycle - savedThisCycle);
-
 /// Hasil perhitungan Safe-to-Spend beserta rinciannya, untuk layar
 /// "Dari mana angka ini?".
 final class SafeToSpend {
@@ -47,6 +43,7 @@ final class SafeToSpend {
     required this.amount,
     required this.dailyAllowance,
     required this.daysLeft,
+    this.bufferBasisPoints = defaultBufferBasisPoints,
   });
 
   /// Saldo semua akun yang dihitung di Safe-to-Spend.
@@ -62,7 +59,21 @@ final class SafeToSpend {
   final int dailyAllowance;
   final int daysLeft;
 
+  /// Persen buffer yang dipakai (basis poin, 500 = 5%).
+  final int bufferBasisPoints;
+
   bool get isNegative => amount < 0;
+
+  /// Safe-to-Spend kalau saldo yang dihitung berubah sebesar [delta], dengan
+  /// kewajiban, tabungan, dan sisa hari yang sama. Dipakai untuk pratinjau
+  /// "Sisa aman setelah ini" sebelum transaksi disimpan.
+  SafeToSpend withBalanceChange(int delta) => calculateSafeToSpend(
+    availableBalance: availableBalance + delta,
+    obligationsReserved: obligationsReserved,
+    savingsReserved: savingsReserved,
+    daysLeft: daysLeft,
+    bufferBasisPoints: bufferBasisPoints,
+  );
 }
 
 /// Basis poin buffer bawaan: 500 = 5% (PRD §5 USP 1).
@@ -98,5 +109,6 @@ SafeToSpend calculateSafeToSpend({
     amount: amount,
     dailyAllowance: amount > 0 ? amount ~/ daysLeft : 0,
     daysLeft: daysLeft,
+    bufferBasisPoints: bufferBasisPoints,
   );
 }

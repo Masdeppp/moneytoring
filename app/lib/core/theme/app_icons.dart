@@ -25,6 +25,22 @@ abstract final class AppIcons {
   static const IconData close = LucideIcons.x;
   static const IconData sparkles = LucideIcons.sparkles;
   static const IconData rotateCcw = LucideIcons.rotateCcw;
+  static const IconData calendar = LucideIcons.calendar;
+  static const IconData pencil = LucideIcons.pencil;
+  static const IconData backspace = LucideIcons.delete;
+  static const IconData check = LucideIcons.check;
+  static const IconData search = LucideIcons.search;
+  static const IconData chevronDown = LucideIcons.chevronDown;
+  static const IconData chevronRight = LucideIcons.chevronRight;
+  static const IconData settings = LucideIcons.settings;
+  static const IconData trash = LucideIcons.trash2;
+  static const IconData archive = LucideIcons.archive;
+  static const IconData target = LucideIcons.target;
+  static const IconData tag = LucideIcons.tag;
+
+  // Arus kas (ringkasan siklus layar 07)
+  static const IconData arrowDownLeft = LucideIcons.arrowDownLeft;
+  static const IconData arrowUpRight = LucideIcons.arrowUpRight;
 
   // Kategori bawaan
   static const IconData utensils = LucideIcons.utensils;
@@ -61,5 +77,87 @@ abstract final class AppIcons {
     'banknote': LucideIcons.banknote,
     'landmark': LucideIcons.landmark,
     'piggy-bank': LucideIcons.piggyBank,
+    // Pilihan tambahan untuk kategori custom (lihat [categoryIconNames])
+    'coffee': LucideIcons.coffee,
+    'shopping-cart': LucideIcons.shoppingCart,
+    'car': LucideIcons.car,
+    'fuel': LucideIcons.fuel,
+    'bike': LucideIcons.bike,
+    'train': LucideIcons.train,
+    'plane': LucideIcons.plane,
+    'zap': LucideIcons.zap,
+    'droplet': LucideIcons.droplet,
+    'wifi': LucideIcons.wifi,
+    'smartphone': LucideIcons.smartphone,
+    'pill': LucideIcons.pill,
+    'book-open': LucideIcons.bookOpen,
+    'gamepad-2': LucideIcons.gamepad2,
+    'music': LucideIcons.music,
+    'tv': LucideIcons.tv,
+    'dumbbell': LucideIcons.dumbbell,
+    'shirt': LucideIcons.shirt,
+    'scissors': LucideIcons.scissors,
+    'baby': LucideIcons.baby,
+    'paw-print': LucideIcons.pawPrint,
+    'users': LucideIcons.users,
+    'hand-heart': LucideIcons.handHeart,
+    'wrench': LucideIcons.wrench,
+    'laptop': LucideIcons.laptop,
+    'store': LucideIcons.store,
+    'briefcase': LucideIcons.briefcase,
+    'coins': LucideIcons.coins,
+    'hand-coins': LucideIcons.handCoins,
+    'trending-up': LucideIcons.trendingUp,
+    'target': LucideIcons.target,
   };
+
+  /// Ikon yang ditawarkan saat membuat atau mengubah kategori
+  /// (Pengaturan → Kategori). Semua nama di sini harus ada di [_byName].
+  static const List<String> categoryIconNames = [
+    'utensils',
+    'coffee',
+    'shopping-cart',
+    'shopping-bag',
+    'bus',
+    'car',
+    'fuel',
+    'bike',
+    'train',
+    'plane',
+    'house',
+    'zap',
+    'droplet',
+    'wifi',
+    'smartphone',
+    'receipt',
+    'credit-card',
+    'heart-pulse',
+    'pill',
+    'graduation-cap',
+    'book-open',
+    'clapperboard',
+    'gamepad-2',
+    'music',
+    'tv',
+    'dumbbell',
+    'shirt',
+    'scissors',
+    'baby',
+    'paw-print',
+    'users',
+    'hand-heart',
+    'gift',
+    'wrench',
+    'laptop',
+    'store',
+    'briefcase',
+    'wallet',
+    'banknote',
+    'coins',
+    'hand-coins',
+    'trending-up',
+    'piggy-bank',
+    'target',
+    'ellipsis',
+  ];
 }

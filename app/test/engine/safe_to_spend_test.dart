@@ -81,11 +81,6 @@ void main() {
     });
   });
 
-  test('sisa target tabungan tidak pernah negatif', () {
-    expect(remainingSavingsTarget(targetPerCycle: 500000, savedThisCycle: 200000), 300000);
-    expect(remainingSavingsTarget(targetPerCycle: 500000, savedThisCycle: 700000), 0);
-  });
-
   group('calculateSafeToSpend', () {
     test('target tabungan dikurangkan sebelum buffer', () {
       final result = calculateSafeToSpend(
@@ -118,6 +113,33 @@ void main() {
       );
       expect(result.buffer, 50);
       expect(result.amount, 949);
+    });
+
+    test('pratinjau perubahan saldo memakai kewajiban, tabungan, dan buffer yang sama', () {
+      final current = calculateSafeToSpend(
+        availableBalance: 3000000,
+        obligationsReserved: 2200000,
+        savingsReserved: 100000,
+        daysLeft: 14,
+        bufferBasisPoints: 300,
+      );
+      final after = current.withBalanceChange(-25000);
+
+      expect(after.availableBalance, 2975000);
+      expect(after.obligationsReserved, 2200000);
+      expect(after.savingsReserved, 100000);
+      expect(after.bufferBasisPoints, 300);
+      expect(after.daysLeft, 14);
+      expect(
+        after.amount,
+        calculateSafeToSpend(
+          availableBalance: 2975000,
+          obligationsReserved: 2200000,
+          savingsReserved: 100000,
+          daysLeft: 14,
+          bufferBasisPoints: 300,
+        ).amount,
+      );
     });
 
     test('buffer bisa dimatikan', () {

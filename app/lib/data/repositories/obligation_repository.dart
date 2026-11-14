@@ -16,6 +16,8 @@ final class ObligationDueView {
     required this.accountId,
     required this.amountType,
     required this.paidAmount,
+    this.lastPaidAt,
+    this.lastPaidAccountName,
   });
 
   final ObligationInstanceRecord instance;
@@ -26,6 +28,12 @@ final class ObligationDueView {
 
   /// Total transaksi pengeluaran yang terhubung ke jatuh tempo ini.
   final int paidAmount;
+
+  /// Waktu dan akun pembayaran terakhir ("Dibayar 3 Nov · BCA").
+  final DateTime? lastPaidAt;
+  final String? lastPaidAccountName;
+
+  int get obligationId => instance.obligationId;
 
   int get instanceId => instance.id;
   LocalDate get dueDate => LocalDate.fromDateTime(instance.dueDate);
@@ -78,6 +86,91 @@ class ObligationRepository {
             startsOn: startsOn.toUtcMidnight(),
           ),
         );
+  }
+
+  /// Mengubah kewajiban (layar 08). Jatuh tempo yang belum lunas ikut
+  /// menyesuaikan:
+  /// - nominal baru dipakai untuk semua jatuh tempo yang belum lunas;
+  /// - kalau tanggalnya berubah, jatuh tempo mulai hari ini yang belum ada
+  ///   pembayarannya dihapus. Tanggal baru berlaku mulai bulan setelah jatuh
+  ///   tempo terakhir yang tersisa (dan tidak sebelum [today]), supaya satu
+  ///   bulan tidak tertagih dua kali. Jatuh temponya dibuat lagi oleh
+  ///   [ensureInstances].
+  Future<void> update(
+    int id, {
+    required String name,
+    required ObligationAmountType amountType,
+    required int amount,
+    required int dueDay,
+    required int categoryId,
+    required LocalDate today,
+  }) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) throw ArgumentError.value(name, 'name', 'tidak boleh kosong');
+    if (amount <= 0) throw ArgumentError.value(amount, 'amount', 'harus lebih dari 0');
+    RangeError.checkValueInInterval(dueDay, 1, 31, 'dueDay');
+    return _db.transaction(() async {
+      final current = await (_db.select(
+        _db.obligations,
+      )..where((o) => o.id.equals(id))).getSingle();
+      final dayChanged = current.dueDay != dueDay;
+
+      final open =
+          await (_db.select(_db.obligationInstances)..where(
+                (i) =>
+                    i.obligationId.equals(id) &
+                    i.status.isInValues([ObligationStatus.pending, ObligationStatus.late]),
+              ))
+              .get();
+      for (final instance in open) {
+        final due = LocalDate.fromDateTime(instance.dueDate);
+        if (dayChanged && due >= today && await _paidFor(instance.id) == 0) {
+          await (_db.delete(_db.obligationInstances)..where((i) => i.id.equals(instance.id))).go();
+        } else if (instance.expectedAmount != amount) {
+          await (_db.update(_db.obligationInstances)..where((i) => i.id.equals(instance.id))).write(
+            ObligationInstancesCompanion(expectedAmount: Value(amount)),
+          );
+          await refreshObligationStatus(_db, instance.id);
+        }
+      }
+
+      var startsOn = LocalDate.fromDateTime(current.startsOn);
+      if (dayChanged) {
+        final latest = _db.obligationInstances.dueDate.max();
+        final row =
+            await (_db.selectOnly(_db.obligationInstances)
+                  ..addColumns([latest])
+                  ..where(_db.obligationInstances.obligationId.equals(id)))
+                .getSingle();
+        final last = row.read(latest);
+        final nextMonth = last == null
+            ? today
+            : LocalDate(last.toUtc().year, last.toUtc().month + 1, 1);
+        startsOn = nextMonth > today ? nextMonth : today;
+      }
+
+      await (_db.update(_db.obligations)..where((o) => o.id.equals(id))).write(
+        ObligationsCompanion(
+          name: Value(trimmed),
+          amountType: Value(amountType),
+          amount: Value(amount),
+          dueDay: Value(dueDay),
+          categoryId: Value(categoryId),
+          startsOn: Value(startsOn.toUtcMidnight()),
+        ),
+      );
+    });
+  }
+
+  Future<int> _paidFor(int instanceId) async {
+    final t = _db.transactions;
+    final total = t.amount.sum();
+    final row =
+        await (_db.selectOnly(t)
+              ..addColumns([total])
+              ..where(t.obligationInstanceId.equals(instanceId)))
+            .getSingle();
+    return row.read(total) ?? 0;
   }
 
   SimpleSelectStatement<$ObligationsTable, ObligationRecord> _active() =>
@@ -155,11 +248,18 @@ class ObligationRepository {
       o.account_id AS obligation_account_id,
       o.amount_type AS obligation_amount_type,
       COALESCE((SELECT SUM(t.amount) FROM transactions t
-                WHERE t.obligation_instance_id = i.id AND t.type = 'expense'), 0) AS paid_amount
+                WHERE t.obligation_instance_id = i.id AND t.type = 'expense'), 0) AS paid_amount,
+      (SELECT t.date FROM transactions t
+        WHERE t.obligation_instance_id = i.id AND t.type = 'expense'
+        ORDER BY unixepoch(t.date) DESC, t.id DESC LIMIT 1) AS last_paid_date,
+      (SELECT a.name FROM transactions t JOIN accounts a ON a.id = t.account_id
+        WHERE t.obligation_instance_id = i.id AND t.type = 'expense'
+        ORDER BY unixepoch(t.date) DESC, t.id DESC LIMIT 1) AS last_paid_account
     FROM obligation_instances i
     JOIN obligations o ON o.id = i.obligation_id
     WHERE o.active = 1
-      AND i.due_date >= ?1 AND i.due_date <= ?2
+      AND ((i.due_date >= ?1 AND i.due_date <= ?2)
+        OR (?4 = 1 AND i.due_date < ?1 AND i.status IN ('pending', 'late')))
       AND (?3 = 0 OR i.status IN ('pending', 'late'))
     ORDER BY i.due_date, o.name''';
 
@@ -167,6 +267,7 @@ class ObligationRepository {
     required LocalDate from,
     required LocalDate through,
     required bool unpaidOnly,
+    bool overdueBefore = false,
   }) => _db
       .customSelect(
         _duesSql,
@@ -174,8 +275,9 @@ class ObligationRepository {
           Variable<DateTime>(from.toUtcMidnight()),
           Variable<DateTime>(through.toUtcMidnight()),
           Variable.withBool(unpaidOnly),
+          Variable.withBool(overdueBefore),
         ],
-        readsFrom: {_db.obligationInstances, _db.obligations, _db.transactions},
+        readsFrom: {_db.obligationInstances, _db.obligations, _db.transactions, _db.accounts},
       )
       .map(
         (row) => ObligationDueView(
@@ -187,6 +289,8 @@ class ObligationRepository {
             row.read<String>('obligation_amount_type'),
           ),
           paidAmount: row.read<int>('paid_amount'),
+          lastPaidAt: row.readNullable<DateTime>('last_paid_date'),
+          lastPaidAccountName: row.readNullable<String>('last_paid_account'),
         ),
       );
 
@@ -195,9 +299,50 @@ class ObligationRepository {
   Future<List<ObligationDueView>> unpaidThrough(LocalDate through) =>
       _dues(from: _beginningOfTime, through: through, unpaidOnly: true).get();
 
+  /// Uang kewajiban yang masih dicadangkan tepat sebelum [before]: jatuh tempo
+  /// sampai [through] (ikut) dikurangi pembayaran sebelum [before]. Jatuh tempo
+  /// yang ditandai lunas dihitung lunas kalau pembayaran terakhirnya sebelum
+  /// [before].
+  Future<int> reservedAsOf({required LocalDate through, required DateTime before}) async {
+    final row = await _db
+        .customSelect(
+          '''
+          SELECT COALESCE(SUM(CASE
+              WHEN x.status = 'skipped' THEN 0
+              WHEN x.status = 'paid' AND (x.last_paid IS NULL OR x.last_paid < unixepoch(?2)) THEN 0
+              ELSE MAX(0, x.expected_amount - x.paid_before)
+            END), 0) AS reserved
+          FROM (
+            SELECT i.status, i.expected_amount,
+              COALESCE((SELECT SUM(t.amount) FROM transactions t
+                        WHERE t.obligation_instance_id = i.id AND t.type = 'expense'
+                          AND unixepoch(t.date) < unixepoch(?2)), 0) AS paid_before,
+              (SELECT MAX(unixepoch(t.date)) FROM transactions t
+                WHERE t.obligation_instance_id = i.id AND t.type = 'expense') AS last_paid
+            FROM obligation_instances i
+            JOIN obligations o ON o.id = i.obligation_id
+            WHERE o.active = 1 AND i.due_date <= ?1
+          ) x''',
+          variables: [Variable<DateTime>(through.toUtcMidnight()), Variable<DateTime>(before)],
+          readsFrom: {_db.obligationInstances, _db.obligations, _db.transactions},
+        )
+        .getSingle();
+    return row.read<int>('reserved');
+  }
+
   /// Semua jatuh tempo (apa pun statusnya) di antara [from] dan [through].
   Stream<List<ObligationDueView>> watchBetween(LocalDate from, LocalDate through) =>
       _dues(from: from, through: through, unpaidOnly: false).watch();
+
+  /// Timeline layar 08: semua jatuh tempo yang dicadangkan dari [cycle]
+  /// (setelah gajian pembuka sampai tepat di gajian berikutnya), ditambah
+  /// jatuh tempo siklus sebelumnya yang belum lunas.
+  Stream<List<ObligationDueView>> watchCycle(PayCycle cycle) => _dues(
+    from: cycle.start.addDays(1),
+    through: cycle.nextPayday,
+    unpaidOnly: false,
+    overdueBefore: true,
+  ).watch();
 
   /// Mencatat pembayaran jatuh tempo sebagai transaksi pengeluaran.
   ///

@@ -4,12 +4,12 @@
 
 | | |
 |---|---|
-| **Versi dokumen** | 0.2 |
-| **Tanggal** | 4 November 2026 |
-| **Status** | Keputusan produk sudah diambil (lihat bagian 16); siap masuk tahap desain |
+| **Versi dokumen** | 0.3 |
+| **Tanggal** | 9 November 2026 (v0.2: 4 November 2026) |
+| **Status** | Fase 1 berjalan; v0.3 menambah fitur hasil recon aplikasi pembanding (bagian 7, 16 #7) |
 | **Platform** | Mobile (Flutter): **Android dulu**, iOS di Fase 3 |
 | **Model bisnis** | Freemium (lihat bagian 13) |
-| **Nama** | "Moneytoring" (*working title*, belum final) |
+| **Nama** | "Moneytoring" (final, lihat bagian 16 #6) |
 | **Desain** | [DESIGN.md](DESIGN.md) · [File Figma](https://www.figma.com/design/kvkQ06T5yRbUwYJQo7QOgA) |
 
 ---
@@ -67,6 +67,7 @@ Pengguna **tidak pernah lagi kekurangan uang untuk kewajibannya** dan tahu setia
 - Akun/login pengguna dan backend sendiri (paling cepat Fase 3, bersama cloud sync).
 - Rilis iOS (Fase 3).
 - Mode penghasilan tidak tetap untuk freelancer (Fase 3).
+- SDK iklan, analitik, atau AI pihak ketiga, dan sinkronisasi dengan kalender perangkat. Semua insight dihitung di HP.
 
 ---
 
@@ -161,11 +162,12 @@ Semua prediksi dan kategorisasi berjalan di HP. Tanpa akun, tanpa server. Ini me
 | ID | Jenis | Pemicu | Prioritas |
 |---|---|---|---|
 | A1 | **Kewajiban Berisiko** | Proyeksi saldo < total kewajiban yang belum dibayar (atau risk ≥ 30% di Tier 2) | 🔴 Tinggi |
-| A2 | Jatuh Tempo | H-3 dan H-1 sebelum kewajiban, kalau belum lunas | 🟠 Sedang |
+| A2 | Jatuh Tempo | H-3 dan H-1 sebelum kewajiban, kalau belum lunas. Untuk langganan: "Netflix diperpanjang 3 hari lagi, Rp 54.000. Masih dipakai?" dengan aksi *Berhenti langganan* | 🟠 Sedang |
 | A3 | Belum Tercatat | Lewat jatuh tempo, tidak ada transaksi yang cocok | 🟠 Sedang |
 | A4 | Pace Terlalu Cepat | % Safe-to-Spend terpakai > % siklus berjalan + margin | 🟡 Rendah |
 | A5 | Anomali Transaksi | Transaksi menyimpang dari pola | 🟡 Rendah |
 | A6 | Ringkasan Mingguan | Tiap Minggu malam | ⚪ Info |
+| A7 | Target Tabungan Tertinggal | H-5 sebelum gajian, setoran siklus ini masih kurang dari kebutuhan per siklus sebuah target | 🟡 Rendah |
 
 **Aturan anti-spam:** maksimal 1 alert per hari untuk prioritas rendah dan sedang, ada jam tenang (default 21.00–07.00), dan A1 boleh menembus batas tersebut.
 
@@ -187,17 +189,22 @@ Semua prediksi dan kategorisasi berjalan di HP. Tanpa akun, tanpa server. Ini me
 | Widget home screen (Safe-to-Spend + tombol tambah) | P1 | Sangat membantu retensi |
 | Scan struk (OCR on-device, ML Kit) | P2 | |
 | Baca notifikasi e-wallet/m-banking (Android) | P2 | Sensitif dari sisi izin dan privasi, harus opt-in |
+| Akun kartu kredit & paylater | P2 | Akun berjenis utang: belanja menambah tagihan, bukan mengurangi saldo tunai. Tagihan per periode otomatis menjadi kewajiban di tanggal jatuh temponya. Sebelum ada, tagihan paylater dicatat sebagai kewajiban estimasi |
 
 ### 7.2 Kewajiban & siklus (inti)
 | Fitur | Prioritas | Keterangan |
 |---|---|---|
 | Pengaturan siklus gajian | P0 | Tanggal tetap / hari kerja terakhir; geser kalau jatuh di hari libur |
 | CRUD Kewajiban Rutin | P0 | Nominal tetap atau estimasi (mis. listrik ±Rp 300rb), tanggal jatuh tempo, akun |
-| Kalender/timeline kewajiban per siklus | P0 | Status: Belum, Lunas, Terlambat |
+| Timeline kewajiban per siklus | P0 | Status: Belum, Lunas, Terlambat (tampilan kalender penuh: P1, di bawah) |
 | Tandai lunas (manual) | P0 | Otomatis membuat transaksi |
 | Auto-match transaksi ke kewajiban | P1 | Berdasarkan kategori + nominal (±10%) + rentang tanggal |
 | Estimasi nominal variabel dari histori | P1 | Listrik bulan lalu menjadi estimasi bulan ini |
-| Kewajiban non-bulanan (tahunan, mingguan) | P2 | Mis. pajak kendaraan, dicicil per siklus |
+| Kewajiban non-bulanan (tahunan, mingguan) | **P1** (dari P2) | Mis. pajak kendaraan, asuransi, langganan tahunan. Kewajiban tahunan bisa **disisihkan per siklus** (Rp 600rb/tahun → Rp 50rb tiap siklus dicadangkan) supaya tidak mengagetkan di bulan jatuh tempo |
+| Langganan | P1 | Kewajiban bertanda langganan (Netflix, Spotify, iCloud, Google One, dll). Ringkasan "Total langganan Rp X/bulan · Y% gaji", pengingat sebelum perpanjangan (A2) dengan aksi *Berhenti langganan* |
+| Pengeluaran terencana (sekali) | P1 | Mis. kondangan 20 Nov Rp 300rb, servis motor. Dicadangkan di Safe-to-Spend seperti kewajiban, lalu selesai setelah dibayar |
+| Kewajiban yang berakhir | P1 | Tanggal selesai untuk cicilan bertenor atau langganan yang dihentikan. Timeline menampilkan "cicilan ke-8 dari 24" |
+| Tampilan kalender siklus | P1 | Hari gajian, jatuh tempo, dan pengeluaran terencana dalam satu kalender per siklus, sebagai alternatif timeline |
 
 ### 7.3 Engine & insight
 | Fitur | Prioritas |
@@ -206,10 +213,11 @@ Semua prediksi dan kategorisasi berjalan di HP. Tanpa akun, tanpa server. Ini me
 | Alert A1–A4 (Tier 0) | P0 |
 | Laporan per siklus: pie kategori, tren, pemasukan vs pengeluaran | P0 |
 | Budget per kategori (opsional) | P1 |
+| **Target tabungan bernama** (wishlist): nama, nominal, tenggat opsional, progres. Kebutuhan per siklus = sisa target ÷ siklus tersisa sampai tenggat, otomatis masuk "target tabungan siklus ini" di rumus Safe-to-Spend. Alert A7 menyusul di Fase 2 | **P0** (dari P1; dibuat di Fase 1 irisan 7, diputuskan 9 Nov 2026) |
 | Forecaster Tier 1 + Anomali (A5) | P1 |
-| 💎 Simulasi What-If | P1 |
+| 💎 Simulasi What-If (termasuk "beli sekarang vs tunggu target tabungan tercapai") | P1 |
 | Feedback alert dan auto-tuning | P1 |
-| 💎 Laporan multi-siklus (perbandingan antar siklus, tren 6–12 siklus) | P1 |
+| 💎 Laporan multi-siklus (perbandingan antar siklus, tren 6–12 siklus) + rentang tanggal bebas | P1 |
 | 💎 Monte Carlo risk score (Tier 2) | P2 |
 | Auto-categorizer TFLite | P2 |
 | "Skor Kesehatan Keuangan" | P2 |
@@ -264,8 +272,8 @@ Notifikasi A1 → buka detail → lihat: kewajiban yang terancam, selisih, proye
 | 1 | **Beranda** | Kartu Safe-to-Spend + jatah harian, indikator risiko (hijau/kuning/merah), 3 kewajiban terdekat, transaksi terakhir, FAB tambah |
 | 2 | **Tambah Transaksi** (bottom sheet) | Keypad nominal, grid kategori, akun, tanggal, catatan |
 | 3 | **Transaksi** | List per hari, filter akun/kategori/tipe, search |
-| 4 | **Kewajiban** | Timeline siklus berjalan, progress "x dari y lunas", CRUD |
-| 5 | **Insight** | Laporan siklus, proyeksi akhir siklus, daftar alert |
+| 4 | **Kewajiban** | Timeline siklus berjalan, progress "x dari y lunas", CRUD. P1: tampilan kalender, langganan, pengeluaran terencana |
+| 5 | **Insight** | Laporan siklus, proyeksi akhir siklus, daftar alert. P1: progres target tabungan, total langganan |
 | 6 | **Simulasi** | Input nominal, lalu dampak ke Safe-to-Spend dan kewajiban |
 | 7 | **Pengaturan** | Siklus, akun, kategori, notifikasi, keamanan, backup |
 
@@ -332,22 +340,35 @@ lib/
 
 ```
 Account          id, name, type(cash/bank/ewallet), initialBalance:int, color, icon, archived
+                 P2: type credit (kartu kredit/paylater), creditLimit:int?, statementDay?, dueDay?
 Category         id, name, type(income/expense), icon, color, isDefault
 Transaction      id, type(income/expense/transfer), amount:int, accountId, toAccountId?,
                  categoryId, date, note, obligationInstanceId?, createdAt
 PayCycleConfig   paydayRule(fixedDate/lastWorkday), day, shiftOnHoliday, expectedIncome:int
 Obligation       id, name, amountType(fixed/estimated), amount:int, dueDay, categoryId,
                  accountId, recurrence(monthly…), active, autoMatchKeywords
+                 P1: kind(bill/subscription/planned), recurrence(once/weekly/monthly/yearly),
+                     dueMonth? (tahunan), endsOn?, reserveMode(onDue/spreadPerCycle)
 ObligationInstance id, obligationId, cycleStart, dueDate, expectedAmount:int,
                  status(pending/paid/late/skipped), paidTransactionId?
 SavingsTarget    id, amountPerCycle:int, accountId
+                 # diganti di skema v3 (Fase 1, irisan 7) oleh dua tabel di bawah
+SavingsGoal      id, name, targetAmount:int? (wajib kalau bertenggat), deadline?,
+                 amountPerCycle:int? (target tanpa tenggat), accountId?, icon, tone, archived
+                 v4: salaryBasisPoints? (target sistem "Sisa gaji": persen perkiraan gaji
+                     per siklus), settledThrough? (siklus terakhir yang sudah ditabung)
+GoalContribution id, goalId, amount:int, date, transactionId?
 Alert            id, type, payload(json), createdAt, readAt, feedback(useful/notUseful/null)
 AlertThreshold   type, value, updatedAt          # hasil auto-tuning
 Entitlement      productId, purchaseToken, status(active/expired/refunded), verifiedAt
                  # cache lokal status Premium; sumber kebenaran tetap Google Play
 ```
 
-### 10.5 Nama aplikasi masih *working title*
+Catatan v0.3:
+- Langganan, pengeluaran terencana, dan kewajiban tahunan memakai tabel dan engine kewajiban yang sama (`dueDatesReservedIn`), jadi tidak ada mesin jadwal kedua. `spreadPerCycle` mencadangkan `amount ÷ jumlah siklus sampai jatuh tempo` di setiap siklus.
+- Progres target = jumlah `GoalContribution`. Setoran dicatat lewat tombol Setor (bukan ditebak dari transfer); kalau target punya rekening tujuan, setorannya sekaligus menjadi transfer ke rekening itu. Target selesai ditandai dengan `archived`. Rinciannya di FASE1 §2 "Target tabungan bernama".
+
+### 10.5 Nama brand di satu tempat
 `applicationId` **tidak bisa diganti** setelah aplikasi terbit di Play Store, sedangkan nama tampilan bisa diganti kapan saja. Karena itu:
 - Pakai `applicationId` yang netral dan tidak memuat nama brand, mis. `com.<namamu>.keuangan`.
 - Simpan nama brand di **satu tempat** saja (file l10n `appName` + `android:label`), jangan di-hardcode di widget.
@@ -359,11 +380,11 @@ Entitlement      productId, purchaseToken, status(active/expired/refunded), veri
 
 | Area | Target |
 |---|---|
-| Performa | Cold start < 2 dtk (mid-range Android); simpan transaksi → Safe-to-Spend ter-update < 100 ms |
+| Performa | Cold start < 2 dtk (mid-range Android); simpan transaksi → Safe-to-Spend ter-update < 100 ms. Laporan dan ringkasan dihitung dengan agregat SQL (`GROUP BY` + indeks tanggal/kategori), tidak dengan memuat semua baris; Safe-to-Spend dihitung ulang hanya saat data berubah; satu job latar belakang per hari, tanpa polling |
 | Ukuran APK | < 25 MB (sebelum model TFLite) |
 | Offline | 100% fitur MVP jalan tanpa internet |
 | Keamanan | DB terenkripsi, app lock, backup terenkripsi dengan password pengguna |
-| Privasi | Tanpa analytics yang mengirim data finansial; crash report (opsional) tanpa PII |
+| Privasi | Tanpa analytics yang mengirim data finansial; tanpa SDK iklan/analitik/AI pihak ketiga (mis. Firebase Analytics, Facebook SDK); crash log disimpan di HP dan dibagikan manual oleh pengguna kalau mau. Tanpa izin kontak, lokasi, atau kalender |
 | Aksesibilitas | Dukung text scaling hingga 1.3×, kontras WCAG AA, label semantics |
 | Kompatibilitas | Android 8.0+ (API 26); iOS 14+ saat rilis iOS |
 | Kualitas | Unit test coverage `engine/` ≥ 90%; keseluruhan ≥ 70% |
@@ -382,7 +403,7 @@ Entitlement      productId, purchaseToken, status(active/expired/refunded), veri
 | **Outcome**: pengguna yang melaporkan semua kewajiban lunas tepat waktu | ≥ 85% |
 | **Konversi Premium** (setelah paywall rilis di Fase 2) | 2–5% pengguna aktif bulanan |
 
-> Karena aplikasinya privacy-first, metrik diambil dari **analytics anonim opt-in** (event agregat, tanpa nominal) dan survei in-app.
+> Karena aplikasinya privacy-first, metrik diambil dari **ringkasan anonim opt-in** yang dihitung di HP (event agregat, tanpa nominal) lalu dikirim tester sendiri, plus survei in-app. Tidak ada SDK analitik pihak ketiga.
 
 ---
 
@@ -397,13 +418,15 @@ Entitlement      productId, purchaseToken, status(active/expired/refunded), veri
 |---|:---:|:---:|
 | Pencatatan, akun & kategori **tanpa batas** | ✅ | ✅ |
 | Kewajiban Rutin **tanpa batas** + kalender + auto-match | ✅ | ✅ |
+| Langganan, pengeluaran terencana, kewajiban tahunan/mingguan | ✅ | ✅ |
+| Target tabungan bernama **tanpa batas** + progres | ✅ | ✅ |
 | Safe-to-Spend + Jatah Harian | ✅ | ✅ |
 | Alert A1–A6 (Tier 0 & Tier 1) | ✅ | ✅ |
 | Laporan siklus berjalan & siklus sebelumnya | ✅ | ✅ |
 | Backup/restore terenkripsi, app lock, widget | ✅ | ✅ |
 | **Simulasi What-If** | Coba 3× gratis | ✅ Tanpa batas |
 | **Risk score Tier 2** (peluang kewajiban tidak tertutup, proyeksi P50/P80) | Hanya label risiko (hijau/kuning/merah) | ✅ Angka peluang + grafik proyeksi |
-| **Laporan multi-siklus** (perbandingan & tren 6–12 siklus) | — | ✅ |
+| **Laporan multi-siklus** (perbandingan & tren 6–12 siklus) + rentang tanggal bebas | — | ✅ |
 | **Export CSV/PDF** | — | ✅ |
 | Tema & ikon aplikasi custom | — | ✅ |
 
@@ -423,10 +446,10 @@ Entitlement      productId, purchaseToken, status(active/expired/refunded), veri
 |---|---|---|
 | **0a: Desain (Figma)** | 2–3 minggu | Design system (warna, tipografi, spacing, komponen), wireframe → hi-fi untuk 7 layar MVP + onboarding, prototype alur onboarding & tambah transaksi, uji cepat ke 3–5 calon pengguna |
 | **0b: Fondasi** | 1–2 minggu | Setup project Flutter (Android), arsitektur, DB schema + migrasi, implementasi design tokens dari Figma ke `ThemeData`, CI |
-| **1: MVP** | 6–8 minggu | Semua **P0**: pencatatan, akun, kategori, siklus gajian, Kewajiban, Safe-to-Spend, alert Tier 0, laporan dasar, app lock, backup. **Gratis penuh** |
+| **1: MVP** | 6–8 minggu | Semua **P0**: pencatatan, akun, kategori, siklus gajian, Kewajiban, Safe-to-Spend, alert Tier 0, laporan dasar, app lock, backup, target tabungan bernama (skema v3). **Gratis penuh** |
 | **1.5: Beta tertutup** | 2–3 minggu | 20–50 tester lewat Play Console (closed testing), tuning threshold alert, perbaikan UX input, survei kesediaan membayar |
-| **2: Smart + Premium** | 5–7 minggu | **P1**: auto-match, forecaster Tier 1, anomali, 💎 What-If, 💎 laporan multi-siklus, 💎 export, feedback alert, widget, input bahasa natural, budget kategori, **paywall + Play Billing** |
-| **3: Intelligence & Ekspansi** | 8+ minggu | **P2**: 💎 Monte Carlo risk, TFLite categorizer, OCR struk, **mode penghasilan tidak tetap**, cloud sync + akun, **rilis iOS** |
+| **2: Smart + Premium** | 7–9 minggu | **P1**: auto-match, forecaster Tier 1, anomali, 💎 What-If, 💎 laporan multi-siklus, 💎 export, feedback alert, widget, input bahasa natural, budget kategori, **paywall + Play Billing**. Tambahan v0.3 (skema v3): **langganan, kewajiban tahunan/mingguan/sekali + disisihkan per siklus, kewajiban yang berakhir, kalender siklus, alert A7 untuk target tabungan** |
+| **3: Intelligence & Ekspansi** | 8+ minggu | **P2**: 💎 Monte Carlo risk, TFLite categorizer, OCR struk, **mode penghasilan tidak tetap**, **akun kartu kredit & paylater**, cloud sync + akun, **rilis iOS** |
 
 > Desain Figma dikerjakan **sebelum** coding supaya keputusan UX (terutama Quick Add ≤ 3 tap dan tampilan Safe-to-Spend) teruji lebih dulu. Mengubah desain di Figma jauh lebih murah daripada refactor widget.
 
@@ -441,7 +464,7 @@ Entitlement      productId, purchaseToken, status(active/expired/refunded), veri
 | **Alert fatigue** | Notifikasi dimatikan | Batas frekuensi, jam tenang, feedback + auto-tuning, setiap alert punya aksi |
 | **Data tidak akurat** (transaksi lupa dicatat, saldo meleset) | Safe-to-Spend salah | Fitur "Sesuaikan saldo" (rekonsiliasi cepat), prompt A3 untuk kewajiban yang belum tercatat |
 | **Kehilangan data** (HP hilang/rusak) | Fatal untuk kepercayaan | Backup terenkripsi + pengingat backup berkala; cloud sync di Fase 3 |
-| **Scope creep** | MVP molor | Patuh ke prioritas P0; fitur ML canggih baru masuk setelah MVP divalidasi |
+| **Scope creep** | MVP molor | Patuh ke prioritas P0; fitur ML canggih baru masuk setelah MVP divalidasi. Fitur tambahan v0.3 masuk P1/P2, kecuali target tabungan bernama yang menggantikan target tunggal yang memang sudah direncanakan di irisan 7 |
 | **Regulasi/izin notifikasi** (fitur baca notifikasi) | Penolakan Play Store | Ditunda ke P2, opt-in eksplisit, kebijakan privasi jelas |
 | **Paywall terasa mengganggu** | Rating turun, pengguna pindah aplikasi | Nilai inti tetap gratis (bagian 13.1), percobaan What-If gratis, paywall hanya muncul saat pengguna membuka fitur premium (tanpa pop-up paksa) |
 | **Pembelian dibajak** (APK mod) karena tanpa verifikasi server | Kehilangan sebagian pendapatan | Risiko diterima untuk tahap awal; tambahkan Play Integrity API / verifikasi server saat backend tersedia di Fase 3 |
@@ -461,11 +484,12 @@ Diputuskan pada 4 November 2026:
 | 3 | Akun pengguna | **Tanpa akun di MVP** | Offline-first, tanpa backend; pembelian di-restore lewat Google Play |
 | 4 | Tim | **Solo dev + desain Figma dulu** | Ada Fase 0a (desain) sebelum coding |
 | 5 | Mode penghasilan tidak tetap | **Fase 3** | MVP fokus ke persona penghasilan tetap |
-| 6 | Nama | **"Moneytoring" masih working title** | `applicationId` & package name netral (bagian 10.5) |
+| 6 | Nama | **"Moneytoring"** (diputuskan 9 Nov 2026; risiko kemiripan dengan "Moneytory" milik Jenius sudah diketahui, lihat `replica/brand.md`) | `applicationId` & package name tetap netral (bagian 10.5); cek merek DJKI sebelum rilis |
+| 7 | Fitur dari recon aplikasi pembanding (`replica/recon.md`, 9 Nov 2026) | **Diambil cara kerjanya saja**, sebagai logika lokal tanpa layanan jaringan. Tampilan tetap desain sendiri | Langganan, kewajiban non-bulanan & sekali, kalender siklus, A7 masuk P1 (Fase 2); target tabungan bernama dibuat di Fase 1 irisan 7 (diputuskan 9 Nov 2026); kartu kredit & paylater P2. Tidak diambil: SDK iklan/analitik, AI di server, sinkron kalender perangkat |
 
 ### Masih terbuka (bisa diputuskan nanti, tidak menghambat Fase 0–1)
-- Skema harga Premium (langganan vs sekali bayar) dan nominalnya. Diputuskan sebelum Fase 2.
-- Nama final & identitas visual (logo, warna brand). Idealnya sebelum desain hi-fi di Fase 0a selesai.
+- Skema harga Premium (langganan vs sekali bayar) dan nominalnya. Diputuskan sebelum Fase 2. Aplikasi pembanding menawarkan keduanya (langganan dan sekali bayar seumur hidup); pola ini layak dipertimbangkan.
+- Logo (brief ada di `replica/brand.md`). Nama dan warna brand sudah diputuskan.
 
 ---
 

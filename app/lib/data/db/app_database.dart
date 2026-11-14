@@ -14,7 +14,8 @@ part 'app_database.g.dart';
     PayCycleConfigs,
     Obligations,
     ObligationInstances,
-    SavingsTargets,
+    SavingsGoals,
+    GoalContributions,
     Alerts,
     AlertThresholds,
     Entitlements,
@@ -26,7 +27,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -90,6 +91,24 @@ final OnUpgrade _migrationSteps = stepByStep(
 
     await m.create(schema.idxObligationInstancesDue);
     await m.create(schema.idxTransactionsObligationInstance);
+  },
+  from2To3: (m, schema) async {
+    // Target tunggal per siklus menjadi target bernama tanpa tenggat dengan
+    // nominal per siklus yang sama (docs/FASE1.md, "Target tabungan bernama").
+    await m.create(schema.savingsGoals);
+    await m.create(schema.goalContributions);
+    await m.create(schema.idxGoalContributionsGoal);
+    await m.database.customStatement('''
+      INSERT INTO savings_goals (name, amount_per_cycle, account_id)
+      SELECT 'Tabungan', amount_per_cycle, account_id
+      FROM savings_targets WHERE amount_per_cycle > 0''');
+    await m.deleteTable('savings_targets');
+  },
+  from3To4: (m, schema) async {
+    // Sisihan persen gaji yang ditabung otomatis saat gajian (docs/FASE1.md,
+    // "Sisihkan dari gaji"). Target lama tetap target biasa (kolom kosong).
+    await m.addColumn(schema.savingsGoals, schema.savingsGoals.salaryBasisPoints);
+    await m.addColumn(schema.savingsGoals, schema.savingsGoals.settledThrough);
   },
 );
 

@@ -5,6 +5,7 @@ import 'package:keuangan_app/app.dart';
 import 'package:keuangan_app/core/model/enums.dart';
 import 'package:keuangan_app/data/db/database_provider.dart';
 import 'package:keuangan_app/data/providers.dart';
+import 'package:keuangan_app/data/repositories/obligation_repository.dart';
 import 'package:keuangan_app/data/services/safe_to_spend_service.dart';
 import 'package:keuangan_app/engine/common/local_date.dart';
 import 'package:keuangan_app/engine/cycle/pay_cycle.dart';
@@ -52,6 +53,12 @@ void main() {
       ),
       onboardingStatusProvider.overrideWith((ref) => Stream.value(onboarded)),
       safeToSpendProvider.overrideWith((ref) => Stream.value(summary ?? snapshot())),
+      allCategoriesProvider.overrideWith((ref) => Stream.value(const [])),
+      recentTransactionsProvider.overrideWith((ref) => Stream.value(const [])),
+      cycleObligationsProvider.overrideWith(
+        (ref) => Stream.value((cycle: snapshot().cycle, dues: const <ObligationDueView>[])),
+      ),
+      activeObligationsProvider.overrideWith((ref) => Stream.value(const [])),
     ],
     child: const MoneytoringApp(),
   );
@@ -101,7 +108,11 @@ void main() {
     await tester.tap(find.widgetWithText(NavigationDestination, 'Kewajiban'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Layar Kewajiban dibangun di Fase 1'), findsOneWidget);
+    expect(
+      find.text('Belum ada kewajiban rutin. Ketuk + untuk menambah kos, cicilan, atau tagihan.'),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('Tambah kewajiban'), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsNothing);
   });
 
@@ -109,6 +120,10 @@ void main() {
     await tester.pumpWidget(app());
     await tester.pumpAndSettle();
 
-    expect(find.text('Terbuka · cipher chacha20 · skema v2 · 13 kategori'), findsOneWidget);
+    // Seksi Beranda mendorong menu developer ke bawah lipatan.
+    final tile = find.text('Terbuka · cipher chacha20 · skema v2 · 13 kategori');
+    await tester.scrollUntilVisible(tile, 200, scrollable: find.byType(Scrollable).first);
+    expect(tile, findsOneWidget);
+    expect(find.text('Belum ada transaksi. Ketuk + untuk mencatat yang pertama.'), findsOneWidget);
   });
 }
