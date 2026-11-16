@@ -1,5 +1,4 @@
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:keuangan_app/app.dart';
@@ -9,6 +8,7 @@ import 'package:keuangan_app/data/db/app_database.dart';
 import 'package:keuangan_app/data/db/database_provider.dart';
 import 'package:keuangan_app/data/providers.dart';
 import 'package:keuangan_app/engine/cycle/holiday_calendar.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   testWidgets('pengguna baru menyelesaikan onboarding lalu melihat angka yang sama di Beranda', (

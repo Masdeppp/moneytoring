@@ -49,6 +49,9 @@ dart run drift_dev make-migrations # setelah schemaVersion naik
   `_migrationSteps`, lalu tambah test data di `test/drift/keuangan/migration_test.dart`.
 - UI: warna dari `context.colors`, teks dari `AppTypography`, ikon dari `AppIcons`; teks overline
   ditulis UPPERCASE oleh pemanggil.
+- Material diimpor dari `package:material_ui/material_ui.dart`, bukan `package:flutter/material.dart`
+  (usang sejak Flutter 3.50). Lokalisasi Material memakai `GlobalMaterialLocalizations.delegates`
+  dari `material_ui` (`lib/app.dart`).
 - Riverpod 3 menjeda stream provider yang tidak punya listener: di test, `container.listen(...)`
   dulu sebelum membaca `.future`.
 - Widget test dengan Drift: setelah `pumpWidget(const SizedBox())`, jalankan
