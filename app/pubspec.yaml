@@ -29,6 +29,7 @@ dependencies:
   # UI & format
   intl: ^0.20.3
   lucide_icons_flutter: ^4.0.2
+  material_ui: ^1.11.0
 
 dev_dependencies:
   flutter_test:

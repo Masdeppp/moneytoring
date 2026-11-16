@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:keuangan_app/app.dart';
@@ -11,6 +10,7 @@ import 'package:keuangan_app/engine/common/local_date.dart';
 import 'package:keuangan_app/engine/cycle/pay_cycle.dart';
 import 'package:keuangan_app/engine/forecast/risk_tier0.dart';
 import 'package:keuangan_app/engine/safe_to_spend/safe_to_spend.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Snapshot tiruan dengan skenario DESIGN.md: 11 Nov, gajian 25 Nov.
 SafeToSpendSnapshot snapshot({

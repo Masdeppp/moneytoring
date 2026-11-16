@@ -1,12 +1,12 @@
 @Tags(['golden'])
 library;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:keuangan_app/core/theme/app_theme.dart';
 import 'package:keuangan_app/core/theme/app_typography.dart';
 import 'package:keuangan_app/features/dev/component_gallery.dart';
+import 'package:material_ui/material_ui.dart';
 
 // Golden = gambar referensi. Kalau tampilan sengaja diubah, perbarui dengan:
 //   flutter test --update-goldens --tags golden
